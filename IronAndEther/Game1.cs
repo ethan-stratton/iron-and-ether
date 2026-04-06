@@ -38,6 +38,7 @@ public class Game1 : Game
     private Vector2 _trCameraPos; // camera position in tile renderer mode
     // Painter state
     private bool _trPaintMode = false;  // false=browse, true=paint
+    private bool _trShowOverlay = true; // show collision/object overlay in paint mode
     private int _trPaintRoom = 1;       // which room we're painting
     private int _trSelectedTile = -1;   // selected tile ID from palette (-1 = eraser)
     private int _trSelectedSheet = 0;   // which sheet the selected tile is from
@@ -25028,7 +25029,19 @@ public class Game1 : Game
         if (kb.IsKeyDown(Keys.P) && !_prevKb.IsKeyDown(Keys.P))
         {
             _trPaintMode = !_trPaintMode;
-            if (_trPaintMode) _trCameraPos = Vector2.Zero; // reset camera for paint mode
+            if (_trPaintMode)
+            {
+                _trCameraPos = Vector2.Zero;
+                // Initialize walls/cave/torches for overlay
+                _arena = new Rectangle(60, 80, 1160, _trPaintRoom == 11 ? 1300 : 580);
+                InitScreenWalls();
+                // Set up cave data for room 5
+                int ax = _arena.Left, ay = _arena.Top;
+                _caveEntrance = new Rectangle(ax + 290, ay + 180, 60, 40);
+                int caveW = 400, caveH = 300;
+                int caveCX = ax + 320, caveCY = ay + 260;
+                _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
+            }
         }
         
         if (_trPaintMode)
@@ -25122,9 +25135,9 @@ public class Game1 : Game
         
         // Left/Right to switch rooms
         if (kb.IsKeyDown(Keys.Left) && !_prevKb.IsKeyDown(Keys.Left))
-        { _trPaintRoom = Math.Max(1, _trPaintRoom - 1); _trCameraPos = Vector2.Zero; }
+        { _trPaintRoom = Math.Max(1, _trPaintRoom - 1); _trCameraPos = Vector2.Zero; _arena = new Rectangle(60, 80, 1160, _trPaintRoom == 11 ? 1300 : 580); InitScreenWalls(); }
         if (kb.IsKeyDown(Keys.Right) && !_prevKb.IsKeyDown(Keys.Right))
-        { _trPaintRoom = Math.Min(11, _trPaintRoom + 1); _trCameraPos = Vector2.Zero; }
+        { _trPaintRoom = Math.Min(11, _trPaintRoom + 1); _trCameraPos = Vector2.Zero; _arena = new Rectangle(60, 80, 1160, _trPaintRoom == 11 ? 1300 : 580); InitScreenWalls(); }
         
         // Tab cycles palette sheet
         if (kb.IsKeyDown(Keys.Tab) && !_prevKb.IsKeyDown(Keys.Tab))
@@ -25137,6 +25150,10 @@ public class Game1 : Game
         // X = eraser
         if (kb.IsKeyDown(Keys.X) && !_prevKb.IsKeyDown(Keys.X))
             _trSelectedTile = -1;
+        
+        // G = toggle collision overlay
+        if (kb.IsKeyDown(Keys.G) && !_prevKb.IsKeyDown(Keys.G))
+            _trShowOverlay = !_trShowOverlay;
         
         // Ctrl+S to save
         if (kb.IsKeyDown(Keys.LeftControl) && kb.IsKeyDown(Keys.S) && !_prevKb.IsKeyDown(Keys.S))
@@ -25381,6 +25398,87 @@ public class Game1 : Game
             }
         }
         
+        // ── Collision/Object Overlay ──
+        if (_trShowOverlay)
+        {
+            // Arena boundary — green outline
+            int oax = gridX + 60; // arena.Left=60
+            int oay = gridY + 80; // arena.Top=80
+            int oaw = 1160, oah = (_trPaintRoom == 11) ? 1300 : 580;
+            DrawRect(oax, oay, oaw, 2, Color.Lime * 0.6f);
+            DrawRect(oax, oay + oah, oaw, 2, Color.Lime * 0.6f);
+            DrawRect(oax, oay, 2, oah, Color.Lime * 0.6f);
+            DrawRect(oax + oaw, oay, 2, oah, Color.Lime * 0.6f);
+            // Label
+            DrawTextOutlined(oax + 4, oay + 4, "ARENA", Color.Lime * 0.8f, Color.Black, 0.6f);
+            
+            // Wall rects — red semi-transparent fill
+            if (_screenWalls.TryGetValue(_trPaintRoom, out var walls))
+            {
+                foreach (var w in walls)
+                {
+                    int wx = gridX + w.X;
+                    int wy = gridY + w.Y;
+                    DrawRect(wx, wy, w.Width, w.Height, Color.Red * 0.3f);
+                    DrawRect(wx, wy, w.Width, 1, Color.Red * 0.7f);
+                    DrawRect(wx, wy + w.Height, w.Width, 1, Color.Red * 0.7f);
+                    DrawRect(wx, wy, 1, w.Height, Color.Red * 0.7f);
+                    DrawRect(wx + w.Width, wy, 1, w.Height, Color.Red * 0.7f);
+                }
+                DrawTextOutlined(oax + 4, oay + 16, $"WALLS: {walls.Count}", Color.Red * 0.8f, Color.Black, 0.6f);
+            }
+            
+            // Cave area — blue (room 5 only, but show for any that has it)
+            if (_trPaintRoom == 5)
+            {
+                // Cave entrance
+                var ce = _caveEntrance;
+                DrawRect(gridX + ce.X, gridY + ce.Y, ce.Width, ce.Height, Color.Cyan * 0.3f);
+                DrawTextOutlined(gridX + ce.X, gridY + ce.Y - 12, "CAVE ENTRANCE", Color.Cyan * 0.8f, Color.Black, 0.5f);
+                
+                // Cave area
+                var ca = _caveArea;
+                DrawRect(gridX + ca.X, gridY + ca.Y, ca.Width, ca.Height, Color.Blue * 0.2f);
+                DrawRect(gridX + ca.X, gridY + ca.Y, ca.Width, 1, Color.Blue * 0.6f);
+                DrawRect(gridX + ca.X, gridY + ca.Y + ca.Height, ca.Width, 1, Color.Blue * 0.6f);
+                DrawRect(gridX + ca.X, gridY + ca.Y, 1, ca.Height, Color.Blue * 0.6f);
+                DrawRect(gridX + ca.X + ca.Width, gridY + ca.Y, 1, ca.Height, Color.Blue * 0.6f);
+                DrawTextOutlined(gridX + ca.X + 4, gridY + ca.Y + 4, "CAVE INTERIOR", Color.Blue * 0.8f, Color.Black, 0.6f);
+            }
+            
+            // Torches — yellow dots
+            foreach (var torch in _torches)
+            {
+                int tx = gridX + (int)torch.X;
+                int ty = gridY + (int)torch.Y;
+                DrawRect(tx - 4, ty - 4, 8, 8, Color.Yellow * 0.7f);
+                DrawRect(tx - 5, ty - 5, 10, 1, Color.Yellow);
+                DrawRect(tx - 5, ty + 4, 10, 1, Color.Yellow);
+                DrawRect(tx - 5, ty - 5, 1, 10, Color.Yellow);
+                DrawRect(tx + 4, ty - 5, 1, 10, Color.Yellow);
+            }
+            
+            // Doors — magenta indicators at edges
+            string[] sides = { "N", "S", "E", "W" };
+            foreach (var side in sides)
+            {
+                if (HasDoorOnSide(_trPaintRoom, side))
+                {
+                    int dx = 0, dy = 0, dw = 0, dh = 0;
+                    int doorSize = 100;
+                    switch (side)
+                    {
+                        case "N": dx = oax + oaw / 2 - doorSize / 2; dy = oay - 6; dw = doorSize; dh = 6; break;
+                        case "S": dx = oax + oaw / 2 - doorSize / 2; dy = oay + oah; dw = doorSize; dh = 6; break;
+                        case "W": dx = oax - 6; dy = oay + oah / 2 - doorSize / 2; dw = 6; dh = doorSize; break;
+                        case "E": dx = oax + oaw; dy = oay + oah / 2 - doorSize / 2; dw = 6; dh = doorSize; break;
+                    }
+                    DrawRect(dx, dy, dw, dh, Color.Magenta * 0.7f);
+                    DrawTextOutlined(dx, dy - 10, $"DOOR {side}", Color.Magenta * 0.8f, Color.Black, 0.5f);
+                }
+            }
+        }
+        
         // ── Palette (left side, fixed) ──
         DrawRect(0, 50, palW, ScreenH - 50, new Color(25, 25, 30));
         
@@ -25430,7 +25528,7 @@ public class Game1 : Game
         string selStr = _trSelectedTile >= 0 ? $"{_tsNames[_trSelectedSheet]}#{_trSelectedTile}" : "ERASER";
         string header = $"PAINT — Room {_trPaintRoom} ({roomCols}×{roomRows})  |  Tile: {selStr}  |  Palette: {_tsNames[_trSheetIdx]}";
         DrawTextOutlined(10, 6, header, new Color(200, 170, 100), Color.Black, 0.9f);
-        string controls = "WASD:pan  L/R:room  TAB:sheet  Click:paint  RClick:erase  X:eraser  F:fill  Ctrl+S:save  P:browse  ESC:back";
+        string controls = "WASD:pan  L/R:room  TAB:sheet  Click:paint  RClick:erase  X:eraser  F:fill  G:overlay  Ctrl+S:save  ESC:back";
         DrawTextOutlined(10, 28, controls, new Color(100, 100, 120), Color.Black, 0.65f);
         
         _spriteBatch.End();
