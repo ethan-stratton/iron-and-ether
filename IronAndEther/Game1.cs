@@ -44,7 +44,10 @@ public class Game1 : Game
     private int _trSelectedSheet = 0;   // which sheet the selected tile is from
     private int _trPalScroll = 0;       // palette scroll offset
     // Room tile data: room → (sheetIdx, tileId) per cell. -1 = empty
+    // Layer 0 = background (floor), Layer 1 = foreground (walls/trees/overlays)
     private Dictionary<int, (int sheet, int tile)[,]> _roomTileData = new();
+    private Dictionary<int, (int sheet, int tile)[,]> _roomTileOverlay = new();
+    private int _trActiveLayer = 0; // 0=background, 1=overlay
     private const int TileSrc = 12; // source tile size in tileset
     private const int TileScale = 3; // display scale
     private const int TileDst = TileSrc * TileScale; // 36px displayed
@@ -10880,11 +10883,11 @@ public class Game1 : Game
         int ay = _arena.Top;
         
         // Cave entrance hitbox — the dark opening at the bottom of the cave structure
-        _caveEntrance = new Rectangle(ax + 290, ay + 180, 60, 40);
+        _caveEntrance = new Rectangle(ax + 220, ay + 140, 60, 40);
         
         // Cave interior area (takes over the whole arena when inside)
         int caveW = 400, caveH = 300;
-        int caveCX = ScreenW / 2, caveCY = ScreenH / 2;
+        int caveCX = ax + 250, caveCY = ay + 220;
         _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
         
         // Cave exit — at the bottom of the cave, light rays
@@ -10948,9 +10951,9 @@ public class Game1 : Game
         int ay = _arena.Top;
         _inCave = false;
         
-        _caveEntrance = new Rectangle(ax + 290, ay + 180, 60, 40);
+        _caveEntrance = new Rectangle(ax + 220, ay + 140, 60, 40);
         int caveW = 400, caveH = 300;
-        int caveCX = ScreenW / 2, caveCY = ScreenH / 2;
+        int caveCX = ax + 250, caveCY = ay + 220;
         _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
         _caveExit = new Rectangle(caveCX - 30, caveCY + caveH / 2 - 20, 60, 20);
         
@@ -16954,31 +16957,46 @@ public class Game1 : Game
     private void DrawTiledFloor(Rectangle area)
     {
         // Check for painted room data first
-        if (_roomTileData.TryGetValue(_currentScreen, out var painted))
+        bool hasPainted = _roomTileData.ContainsKey(_currentScreen) || _roomTileOverlay.ContainsKey(_currentScreen);
+        if (hasPainted)
         {
             var (roomCols, roomRows) = GetRoomTileSize(_currentScreen);
+            var bg = _roomTileData.TryGetValue(_currentScreen, out var bgData) ? bgData : null;
+            var fg = _roomTileOverlay.TryGetValue(_currentScreen, out var fgData) ? fgData : null;
+            
             for (int r = 0; r < roomRows; r++)
             {
                 for (int c = 0; c < roomCols; c++)
                 {
-                    int dx = c * TSDst; // from screen origin (0,0)
+                    int dx = c * TSDst;
                     int dy = r * TSDst;
-                    int drawW = TSDst;
-                    int drawH = TSDst;
                     if (r >= TSRoomRows || c >= TSRoomCols) continue;
                     
-                    var (s, t) = painted[r, c];
-                    if (s >= 0 && t >= 0 && _tsSheets[s] != null)
+                    // Background layer
+                    bool drewBg = false;
+                    if (bg != null)
                     {
-                        int sheetCols = _tsSheets[s].Width / TS16;
-                        int tr2 = t / sheetCols;
-                        int tc2 = t % sheetCols;
-                        var src = new Rectangle(tc2 * TS16, tr2 * TS16, TS16, TS16);
-                        _spriteBatch.Draw(_tsSheets[s], new Rectangle(dx, dy, drawW, drawH), src, Color.White);
+                        var (s, t) = bg[r, c];
+                        if (s >= 0 && t >= 0 && _tsSheets[s] != null)
+                        {
+                            int sheetCols = _tsSheets[s].Width / TS16;
+                            var src = new Rectangle((t % sheetCols) * TS16, (t / sheetCols) * TS16, TS16, TS16);
+                            _spriteBatch.Draw(_tsSheets[s], new Rectangle(dx, dy, TSDst, TSDst), src, Color.White);
+                            drewBg = true;
+                        }
                     }
-                    else
+                    if (!drewBg) DrawRect(dx, dy, TSDst, TSDst, new Color(15, 15, 20));
+                    
+                    // Foreground/overlay layer
+                    if (fg != null)
                     {
-                        DrawRect(dx, dy, drawW, drawH, new Color(15, 15, 20));
+                        var (s2, t2) = fg[r, c];
+                        if (s2 >= 0 && t2 >= 0 && _tsSheets[s2] != null)
+                        {
+                            int sheetCols2 = _tsSheets[s2].Width / TS16;
+                            var src2 = new Rectangle((t2 % sheetCols2) * TS16, (t2 / sheetCols2) * TS16, TS16, TS16);
+                            _spriteBatch.Draw(_tsSheets[s2], new Rectangle(dx, dy, TSDst, TSDst), src2, Color.White);
+                        }
                     }
                 }
             }
@@ -17510,10 +17528,10 @@ public class Game1 : Game
         // Screen 5 (center, starting room): cave entrance + right pillar
         _screenWalls[5] = new List<Rectangle>
         {
-            // Cave structure — larger stone building with opening at bottom
-            new(ax + 260, ay + 120, 120, 60),  // cave roof
-            new(ax + 260, ay + 120, 30, 100),  // left wall
-            new(ax + 350, ay + 120, 30, 100),  // right wall
+            // Cave structure — shifted left/up to match tile layout
+            new(ax + 190, ay + 80, 120, 60),   // cave roof
+            new(ax + 190, ay + 80, 30, 100),   // left wall
+            new(ax + 280, ay + 80, 30, 100),   // right wall
             new(ax + 820, ay + 180, 40, 40),   // right pillar
         };
         
@@ -21197,12 +21215,13 @@ public class Game1 : Game
             int pad = 200;
             DrawRect(_arena.Left - pad, _arena.Top - pad, _arena.Width + pad * 2, _arena.Height + pad * 2, new Color(10, 10, 15));
         }
-        if (!_roomTileData.ContainsKey(_currentScreen))
+        bool roomHasTiles = _roomTileData.ContainsKey(_currentScreen) || _roomTileOverlay.ContainsKey(_currentScreen);
+        if (!roomHasTiles)
             DrawRect(_arena.Left - 2, _arena.Top - 2, _arena.Width + 4, _arena.Height + 4, new Color(40, 40, 50));
         // Tiled floor (replaces flat color if tilesets loaded)
         if (_tsDungeon != null)
         {
-            if (_roomTileData.ContainsKey(_currentScreen))
+            if (roomHasTiles)
                 DrawTiledFloor(new Rectangle(0, 0, ScreenW, _arena.Bottom + 80)); // full screen for painted rooms
             else
                 DrawTiledFloor(_arena); // just arena for auto-tiled
@@ -21211,7 +21230,7 @@ public class Game1 : Game
             DrawRect(_arena.Left, _arena.Top, _arena.Width, _arena.Height, new Color(15, 15, 20));
         
         // Room 11: stone floor tiles to show the extended area
-        if (_currentScreen == 11)
+        if (_currentScreen == 11 && !roomHasTiles)
         {
             int ax = _arena.Left, ay = _arena.Top, aw = _arena.Width, ah = _arena.Height;
             for (int gy = 0; gy < ah; gy += 80)
@@ -21224,7 +21243,7 @@ public class Game1 : Game
         }
 
         // Walls (skip flat rects when room has painted tile data)
-        if (!_roomTileData.ContainsKey(_currentScreen) && _screenWalls.TryGetValue(_currentScreen, out var drawWalls))
+        if (!roomHasTiles && _screenWalls.TryGetValue(_currentScreen, out var drawWalls))
         {
             foreach (var wall in drawWalls)
             {
@@ -24942,41 +24961,82 @@ public class Game1 : Game
         return _roomTileData[room];
     }
     
+    private (int sheet, int tile)[,] GetOrCreateRoomOverlay(int room)
+    {
+        if (!_roomTileOverlay.ContainsKey(room))
+        {
+            var data = new (int sheet, int tile)[TSRoomRows, TSRoomCols];
+            for (int r = 0; r < TSRoomRows; r++)
+                for (int c = 0; c < TSRoomCols; c++)
+                    data[r, c] = (-1, -1);
+            _roomTileOverlay[room] = data;
+        }
+        return _roomTileOverlay[room];
+    }
+    
+    private int?[][] TileLayerToArray((int sheet, int tile)[,] data)
+    {
+        int rows = data.GetLength(0);
+        int cols = data.GetLength(1);
+        var arr = new int?[rows][];
+        for (int r = 0; r < rows; r++)
+        {
+            var row = new int?[cols * 2];
+            for (int c = 0; c < cols; c++)
+            {
+                var (s, t) = data[r, c];
+                if (s >= 0) { row[c * 2] = s; row[c * 2 + 1] = t; }
+                else { row[c * 2] = null; row[c * 2 + 1] = null; }
+            }
+            arr[r] = row;
+        }
+        return arr;
+    }
+    
+    private (int sheet, int tile)[,] ArrayToTileLayer(JsonElement rowsArr)
+    {
+        int rowCount = rowsArr.GetArrayLength();
+        var data = new (int sheet, int tile)[TSRoomRows, TSRoomCols];
+        for (int r = 0; r < TSRoomRows; r++)
+            for (int c = 0; c < TSRoomCols; c++)
+                data[r, c] = (-1, -1);
+        for (int r = 0; r < Math.Min(rowCount, TSRoomRows); r++)
+        {
+            var row = rowsArr[r];
+            int pairs = row.GetArrayLength() / 2;
+            for (int c = 0; c < Math.Min(pairs, TSRoomCols); c++)
+            {
+                var sElem = row[c * 2];
+                var tElem = row[c * 2 + 1];
+                if (sElem.ValueKind == JsonValueKind.Number && tElem.ValueKind == JsonValueKind.Number)
+                    data[r, c] = (sElem.GetInt32(), tElem.GetInt32());
+            }
+        }
+        return data;
+    }
+    
     private void SaveRoomTiles()
     {
-        var dict = new Dictionary<string, int?[][]>();
-        foreach (var kvp in _roomTileData)
+        // Save as {"rooms":{"5":{"bg":[...],"fg":[...]},...}}
+        var rooms = new Dictionary<string, Dictionary<string, int?[][]>>();
+        // Collect all room keys from both layers
+        var allRooms = new HashSet<int>(_roomTileData.Keys);
+        foreach (var k in _roomTileOverlay.Keys) allRooms.Add(k);
+        
+        foreach (int room in allRooms)
         {
-            var data = kvp.Value;
-            int rows = data.GetLength(0);
-            int cols = data.GetLength(1);
-            var arr = new int?[rows][];
-            for (int r = 0; r < rows; r++)
-            {
-                // Each row stores flat pairs: [sheet,tile, sheet,tile, ...] or null,null for empty
-                var row = new int?[cols * 2];
-                for (int c = 0; c < cols; c++)
-                {
-                    var (s, t) = data[r, c];
-                    if (s >= 0)
-                    {
-                        row[c * 2] = s;
-                        row[c * 2 + 1] = t;
-                    }
-                    else
-                    {
-                        row[c * 2] = null;
-                        row[c * 2 + 1] = null;
-                    }
-                }
-                arr[r] = row;
-            }
-            dict[kvp.Key.ToString()] = arr;
+            var entry = new Dictionary<string, int?[][]>();
+            if (_roomTileData.TryGetValue(room, out var bg))
+                entry["bg"] = TileLayerToArray(bg);
+            if (_roomTileOverlay.TryGetValue(room, out var fg))
+                entry["fg"] = TileLayerToArray(fg);
+            rooms[room.ToString()] = entry;
         }
-        string json = JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = false });
+        var wrapper = new Dictionary<string, object> { ["rooms"] = rooms };
+        string json = JsonSerializer.Serialize(wrapper, new JsonSerializerOptions { WriteIndented = false });
         string path = Path.Combine(Content.RootDirectory, "room_tiles.json");
         File.WriteAllText(path, json);
-        System.Console.WriteLine($"Saved room tiles to {path} ({_roomTileData.Count} rooms)");
+        System.Console.WriteLine($"Saved room tiles to {path} ({allRooms.Count} rooms)");
     }
     
     private void LoadRoomTiles()
@@ -24986,36 +25046,33 @@ public class Game1 : Game
         try
         {
             string json = File.ReadAllText(path);
-            var dict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
             _roomTileData.Clear();
-            foreach (var kvp in dict)
+            _roomTileOverlay.Clear();
+            
+            // New format: {"rooms":{"5":{"bg":[...],"fg":[...]}}}
+            if (root.TryGetProperty("rooms", out var roomsElem))
             {
-                int roomNum = int.Parse(kvp.Key);
-                var rowsArr = kvp.Value;
-                int rowCount = rowsArr.GetArrayLength();
-                // Determine cols from first row
-                int colCount = rowCount > 0 ? rowsArr[0].GetArrayLength() / 2 : TSRoomCols;
-                
-                var data = new (int sheet, int tile)[TSRoomRows, TSRoomCols];
-                for (int r = 0; r < TSRoomRows; r++)
-                    for (int c = 0; c < TSRoomCols; c++)
-                        data[r, c] = (-1, -1);
-                
-                for (int r = 0; r < Math.Min(rowCount, TSRoomRows); r++)
+                foreach (var prop in roomsElem.EnumerateObject())
                 {
-                    var row = rowsArr[r];
-                    int pairs = row.GetArrayLength() / 2;
-                    for (int c = 0; c < Math.Min(pairs, TSRoomCols); c++)
-                    {
-                        var sElem = row[c * 2];
-                        var tElem = row[c * 2 + 1];
-                        if (sElem.ValueKind == JsonValueKind.Number && tElem.ValueKind == JsonValueKind.Number)
-                            data[r, c] = (sElem.GetInt32(), tElem.GetInt32());
-                    }
+                    int roomNum = int.Parse(prop.Name);
+                    if (prop.Value.TryGetProperty("bg", out var bgElem))
+                        _roomTileData[roomNum] = ArrayToTileLayer(bgElem);
+                    if (prop.Value.TryGetProperty("fg", out var fgElem))
+                        _roomTileOverlay[roomNum] = ArrayToTileLayer(fgElem);
                 }
-                _roomTileData[roomNum] = data;
             }
-            System.Console.WriteLine($"Loaded room tiles ({_roomTileData.Count} rooms)");
+            else
+            {
+                // Legacy format: {"5":[[...],...]}
+                foreach (var prop in root.EnumerateObject())
+                {
+                    int roomNum = int.Parse(prop.Name);
+                    _roomTileData[roomNum] = ArrayToTileLayer(prop.Value);
+                }
+            }
+            System.Console.WriteLine($"Loaded room tiles ({_roomTileData.Count} bg, {_roomTileOverlay.Count} fg rooms)");
         }
         catch (Exception ex)
         {
@@ -25037,9 +25094,9 @@ public class Game1 : Game
                 InitScreenWalls();
                 // Set up cave data for room 5
                 int ax = _arena.Left, ay = _arena.Top;
-                _caveEntrance = new Rectangle(ax + 290, ay + 180, 60, 40);
+                _caveEntrance = new Rectangle(ax + 220, ay + 140, 60, 40);
                 int caveW = 400, caveH = 300;
-                int caveCX = ax + 320, caveCY = ay + 260;
+                int caveCX = ax + 250, caveCY = ay + 220;
                 _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
             }
         }
@@ -25155,6 +25212,10 @@ public class Game1 : Game
         if (kb.IsKeyDown(Keys.G) && !_prevKb.IsKeyDown(Keys.G))
             _trShowOverlay = !_trShowOverlay;
         
+        // L = toggle layer (0=bg, 1=fg overlay)
+        if (kb.IsKeyDown(Keys.L) && !_prevKb.IsKeyDown(Keys.L))
+            _trActiveLayer = 1 - _trActiveLayer;
+        
         // Ctrl+S to save
         if (kb.IsKeyDown(Keys.LeftControl) && kb.IsKeyDown(Keys.S) && !_prevKb.IsKeyDown(Keys.S))
             SaveRoomTiles();
@@ -25162,7 +25223,7 @@ public class Game1 : Game
         // F to fill entire room with selected tile
         if (kb.IsKeyDown(Keys.F) && !_prevKb.IsKeyDown(Keys.F) && _trSelectedTile >= 0)
         {
-            var data = GetOrCreateRoomTiles(_trPaintRoom);
+            var data = _trActiveLayer == 0 ? GetOrCreateRoomTiles(_trPaintRoom) : GetOrCreateRoomOverlay(_trPaintRoom);
             for (int r = 0; r < roomRows; r++)
                 for (int c = 0; c < roomCols; c++)
                     data[r, c] = (_trSelectedSheet, _trSelectedTile);
@@ -25213,7 +25274,7 @@ public class Game1 : Game
                 int gr = (mouse.Y - camGY) / TSDst;
                 if (gc >= 0 && gc < roomCols && gr >= 0 && gr < roomRows && mouse.Y > 50)
                 {
-                    var data = GetOrCreateRoomTiles(_trPaintRoom);
+                    var data = _trActiveLayer == 0 ? GetOrCreateRoomTiles(_trPaintRoom) : GetOrCreateRoomOverlay(_trPaintRoom);
                     if (_trSelectedTile >= 0)
                         data[gr, gc] = (_trSelectedSheet, _trSelectedTile);
                     else
@@ -25229,7 +25290,7 @@ public class Game1 : Game
             int gr = (mouse.Y - camGY) / TSDst;
             if (gc >= 0 && gc < roomCols && gr >= 0 && gr < roomRows)
             {
-                var data = GetOrCreateRoomTiles(_trPaintRoom);
+                var data = _trActiveLayer == 0 ? GetOrCreateRoomTiles(_trPaintRoom) : GetOrCreateRoomOverlay(_trPaintRoom);
                 data[gr, gc] = (-1, -1);
             }
         }
@@ -25342,8 +25403,9 @@ public class Game1 : Game
         int gridY = 60 - (int)_trCameraPos.Y;
         var (roomCols, roomRows) = GetRoomTileSize(_trPaintRoom);
         
-        // ── Room Grid ──
-        var data = GetOrCreateRoomTiles(_trPaintRoom);
+        // ── Room Grid (both layers) ──
+        var bgData = GetOrCreateRoomTiles(_trPaintRoom);
+        var fgData = GetOrCreateRoomOverlay(_trPaintRoom);
         var mouse = Mouse.GetState();
         
         for (int r = 0; r < roomRows; r++)
@@ -25356,7 +25418,8 @@ public class Game1 : Game
                 // Cull off-screen
                 if (dx + TSDst < palW || dx > ScreenW || dy + TSDst < 50 || dy > ScreenH) continue;
                 
-                var (s, t) = data[r, c];
+                // Background layer
+                var (s, t) = bgData[r, c];
                 if (s >= 0 && t >= 0 && _tsSheets[s] != null)
                 {
                     int sheetCols = _tsSheets[s].Width / TS16;
@@ -25370,7 +25433,18 @@ public class Game1 : Game
                     DrawRect(dx, dy, TSDst, TSDst, new Color(15, 15, 20));
                 }
                 
-                // Grid lines
+                // Foreground/overlay layer (drawn on top, transparency shows through)
+                var (s2, t2) = fgData[r, c];
+                if (s2 >= 0 && t2 >= 0 && _tsSheets[s2] != null)
+                {
+                    int sheetCols2 = _tsSheets[s2].Width / TS16;
+                    int tr3 = t2 / sheetCols2;
+                    int tc3 = t2 % sheetCols2;
+                    var src2 = new Rectangle(tc3 * TS16, tr3 * TS16, TS16, TS16);
+                    _spriteBatch.Draw(_tsSheets[s2], new Rectangle(dx, dy, TSDst, TSDst), src2, Color.White);
+                }
+                
+                // Grid lines (dimmer on inactive layer)
                 DrawRect(dx, dy, TSDst, 1, new Color(40, 40, 50, 80));
                 DrawRect(dx, dy, 1, TSDst, new Color(40, 40, 50, 80));
             }
@@ -25525,10 +25599,11 @@ public class Game1 : Game
         
         // ── Header (fixed) ──
         DrawRect(0, 0, ScreenW, 50, new Color(15, 15, 20, 230));
+        string layerStr = _trActiveLayer == 0 ? "BG" : "FG";
         string selStr = _trSelectedTile >= 0 ? $"{_tsNames[_trSelectedSheet]}#{_trSelectedTile}" : "ERASER";
-        string header = $"PAINT — Room {_trPaintRoom} ({roomCols}×{roomRows})  |  Tile: {selStr}  |  Palette: {_tsNames[_trSheetIdx]}";
+        string header = $"PAINT — Room {_trPaintRoom} ({roomCols}×{roomRows})  |  Layer: {layerStr}  |  Tile: {selStr}  |  Palette: {_tsNames[_trSheetIdx]}";
         DrawTextOutlined(10, 6, header, new Color(200, 170, 100), Color.Black, 0.9f);
-        string controls = "WASD:pan  L/R:room  TAB:sheet  Click:paint  RClick:erase  X:eraser  F:fill  G:overlay  Ctrl+S:save  ESC:back";
+        string controls = "WASD:pan  L/R:room  TAB:sheet  L:layer  Click:paint  RClick:erase  X:eraser  F:fill  G:overlay  Ctrl+S:save  ESC:back";
         DrawTextOutlined(10, 28, controls, new Color(100, 100, 120), Color.Black, 0.65f);
         
         _spriteBatch.End();
