@@ -10883,11 +10883,11 @@ public class Game1 : Game
         int ay = _arena.Top;
         
         // Cave entrance hitbox — the dark opening at the bottom of the cave structure
-        _caveEntrance = new Rectangle(ax + 268, ay + 148, 48, 48);
+        _caveEntrance = new Rectangle(ax + 262, ay + 163, 48, 48);
         
         // Cave interior area (takes over the whole arena when inside)
         int caveW = 400, caveH = 300;
-        int caveCX = ax + 292, caveCY = ay + 172;
+        int caveCX = ax + 286, caveCY = ay + 187;
         _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
         
         // Cave exit — at the bottom of the cave, light rays
@@ -10951,9 +10951,9 @@ public class Game1 : Game
         int ay = _arena.Top;
         _inCave = false;
         
-        _caveEntrance = new Rectangle(ax + 268, ay + 148, 48, 48);
+        _caveEntrance = new Rectangle(ax + 262, ay + 163, 48, 48);
         int caveW = 400, caveH = 300;
-        int caveCX = ax + 292, caveCY = ay + 172;
+        int caveCX = ax + 286, caveCY = ay + 187;
         _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
         _caveExit = new Rectangle(caveCX - 30, caveCY + caveH / 2 - 20, 60, 20);
         
@@ -17529,10 +17529,10 @@ public class Game1 : Game
         _screenWalls[5] = new List<Rectangle>
         {
             // Cave structure — aligned to tile grid (48px cells)
-            new(ax + 232, ay + 52, 48, 144),   // left wall
-            new(ax + 232, ay + 52, 144, 48),   // roof
-            new(ax + 328, ay + 52, 48, 144),   // right wall
-            new(ax + 820, ay + 180, 48, 48),   // right pillar
+            new(ax + 226, ay + 67, 48, 144),   // left wall
+            new(ax + 226, ay + 67, 144, 48),   // roof
+            new(ax + 322, ay + 67, 48, 144),   // right wall
+            new(ax + 800, ay + 160, 48, 48),   // right pillar
         };
         
         // Screen 4 (The Knight's Hall): great hall with pillars and space for sigils
@@ -21261,7 +21261,7 @@ public class Game1 : Game
         }
 
         DrawCaveEntrance();
-        DrawRoomBorders();
+        if (!roomHasTiles) DrawRoomBorders();
         DrawAwakeningDoors();
         DrawRoom3Portal();
         DrawRoom7Shrine();
@@ -25094,9 +25094,9 @@ public class Game1 : Game
                 InitScreenWalls();
                 // Set up cave data for room 5
                 int ax = _arena.Left, ay = _arena.Top;
-                _caveEntrance = new Rectangle(ax + 268, ay + 148, 48, 48);
+                _caveEntrance = new Rectangle(ax + 262, ay + 163, 48, 48);
                 int caveW = 400, caveH = 300;
-                int caveCX = ax + 292, caveCY = ay + 172;
+                int caveCX = ax + 286, caveCY = ay + 187;
                 _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
             }
         }
