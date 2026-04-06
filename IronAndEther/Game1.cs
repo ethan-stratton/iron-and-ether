@@ -22245,13 +22245,13 @@ public class Game1 : Game
                 int jitter = ((int)(_finisherTimer * 30f) % 2 == 0) ? -3 : 3;
                 enemy.Position.X += jitter;
                 enemy.HitFlash = 1f; // force white color
-                enemy.Draw(_spriteBatch, _pixel);
+                enemy.Draw(_spriteBatch, _pixel, _totalTime);
                 enemy.Position.X -= jitter;
                 enemy.HitFlash = 0f;
             }
             else
             {
-                enemy.Draw(_spriteBatch, _pixel);
+                enemy.Draw(_spriteBatch, _pixel, _totalTime);
             }
             
             // Just-staggered visual bark

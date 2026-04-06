@@ -184,7 +184,41 @@ public class Enemy
         }
 
         if (StaggerTimer > 0) return; // stunned
-        if (Pacified) return; // mollified — won't attack
+        if (Pacified)
+        {
+            // Gentle wander — slow random movement, avoid player & walls
+            float wanderSpeed = 12f;
+            AiStateTimer -= dt;
+            if (AiStateTimer <= 0)
+            {
+                // Pick a new random wander direction
+                AiPhase++;
+                int hash = Id * 7919 + AiPhase * 104729;
+                float angle = (hash & 0xFFFF) / 65535f * MathF.PI * 2f;
+                AiStateTimer = 1.5f + ((hash >> 16) & 0xFF) / 255f * 1.5f;
+                Velocity = new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * wanderSpeed;
+            }
+            
+            // Drift away from player if close
+            Vector2 toPl = playerPos - Position;
+            float pDist = toPl.Length();
+            if (pDist < 100f && pDist > 1f)
+            {
+                Vector2 away = -Vector2.Normalize(toPl) * wanderSpeed * 1.5f;
+                Velocity = Vector2.Lerp(Velocity, away, 4f * dt);
+            }
+            
+            // Apply movement
+            Position += Velocity * dt;
+            
+            // Wall avoidance — clamp to arena
+            if (Position.X < arena.Left + Size) { Position = new Vector2(arena.Left + Size, Position.Y); Velocity = new Vector2(MathF.Abs(Velocity.X), Velocity.Y); }
+            if (Position.X > arena.Right - Size) { Position = new Vector2(arena.Right - Size, Position.Y); Velocity = new Vector2(-MathF.Abs(Velocity.X), Velocity.Y); }
+            if (Position.Y < arena.Top + Size) { Position = new Vector2(Position.X, arena.Top + Size); Velocity = new Vector2(Velocity.X, MathF.Abs(Velocity.Y)); }
+            if (Position.Y > arena.Bottom - Size) { Position = new Vector2(Position.X, arena.Bottom - Size); Velocity = new Vector2(Velocity.X, -MathF.Abs(Velocity.Y)); }
+            
+            return;
+        }
         
         ShootTimer -= dt;
         AiStateTimer -= dt;
@@ -850,7 +884,7 @@ public class Enemy
         (int)(Position.X - Size / 2), (int)(Position.Y - Size / 2),
         (int)Size, (int)Size);
 
-    public void Draw(SpriteBatch sb, Texture2D pixel)
+    public void Draw(SpriteBatch sb, Texture2D pixel, float totalTime = 0f)
     {
         if (!Alive) return;
         Color c = BaseColor;
@@ -878,6 +912,14 @@ public class Enemy
             int bx = (int)(Position.X - Size / 2) + drawOffset;
             int by = (int)(Position.Y - Size / 2) + drawOffset;
             
+            // Pacified sway — gentle side-to-side bob
+            if (Pacified)
+            {
+                float sway = MathF.Sin(totalTime * 1.5f + Id * 2.3f) * 2f;
+                float bob = MathF.Sin(totalTime * 2f + Id * 1.7f) * 1.5f;
+                bx += (int)sway;
+                by += (int)bob;
+            }
             // HedgeSniper: invisible when hidden
             if (Type == EnemyType.HedgeSniper && AiPhase == 0)
             {
