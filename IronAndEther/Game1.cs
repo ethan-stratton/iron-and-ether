@@ -10883,7 +10883,7 @@ public class Game1 : Game
         int ay = _arena.Top;
         
         // Cave entrance hitbox — the dark opening at the bottom of the cave structure
-        _caveEntrance = new Rectangle(ax + 270, ay + 161, 48, 48);
+        _caveEntrance = new Rectangle(ax + 274, ay + 160, 48, 48);
         
         // Cave interior area (takes over the whole arena when inside)
         int caveW = 400, caveH = 300;
@@ -10951,7 +10951,7 @@ public class Game1 : Game
         int ay = _arena.Top;
         _inCave = false;
         
-        _caveEntrance = new Rectangle(ax + 270, ay + 161, 48, 48);
+        _caveEntrance = new Rectangle(ax + 274, ay + 160, 48, 48);
         int caveW = 400, caveH = 300;
         int caveCX = ax + 286, caveCY = ay + 187;
         _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
@@ -16363,6 +16363,8 @@ public class Game1 : Game
     private void DrawCaveEntrance()
     {
         if (_gameMode != GameMode.Awakening || _currentScreen != 5 || _inCave) return;
+        // Skip visual if room has painted tiles (cave entrance tile replaces this)
+        if (_roomTileData.ContainsKey(5) || _roomTileOverlay.ContainsKey(5)) return;
         
         var ce = _caveEntrance;
         // Dark opening
@@ -17529,9 +17531,9 @@ public class Game1 : Game
         _screenWalls[5] = new List<Rectangle>
         {
             // Cave structure — aligned to tile grid (48px cells)
-            new(ax + 227, ay + 65, 48, 144),   // left wall
-            new(ax + 227, ay + 65, 144, 48),   // roof
-            new(ax + 323, ay + 65, 48, 144),   // right wall
+            new(ax + 227, ay + 64, 48, 144),   // left wall
+            new(ax + 227, ay + 64, 144, 48),   // roof
+            new(ax + 323, ay + 64, 48, 144),   // right wall
             new(ax + 804, ay + 160, 48, 48),   // right pillar
         };
         
@@ -25092,9 +25094,10 @@ public class Game1 : Game
                 // Initialize walls/cave/torches for overlay
                 _arena = new Rectangle(60, 80, 1160, _trPaintRoom == 11 ? 1300 : 580);
                 InitScreenWalls();
+                InitAwakeningDoors();
                 // Set up cave data for room 5
                 int ax = _arena.Left, ay = _arena.Top;
-                _caveEntrance = new Rectangle(ax + 270, ay + 161, 48, 48);
+                _caveEntrance = new Rectangle(ax + 274, ay + 160, 48, 48);
                 int caveW = 400, caveH = 300;
                 int caveCX = ax + 286, caveCY = ay + 187;
                 _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
@@ -25192,9 +25195,9 @@ public class Game1 : Game
         
         // Left/Right to switch rooms
         if (kb.IsKeyDown(Keys.Left) && !_prevKb.IsKeyDown(Keys.Left))
-        { _trPaintRoom = Math.Max(1, _trPaintRoom - 1); _trCameraPos = Vector2.Zero; _arena = new Rectangle(60, 80, 1160, _trPaintRoom == 11 ? 1300 : 580); InitScreenWalls(); }
+        { _trPaintRoom = Math.Max(1, _trPaintRoom - 1); _trCameraPos = Vector2.Zero; _arena = new Rectangle(60, 80, 1160, _trPaintRoom == 11 ? 1300 : 580); InitScreenWalls(); InitAwakeningDoors(); }
         if (kb.IsKeyDown(Keys.Right) && !_prevKb.IsKeyDown(Keys.Right))
-        { _trPaintRoom = Math.Min(11, _trPaintRoom + 1); _trCameraPos = Vector2.Zero; _arena = new Rectangle(60, 80, 1160, _trPaintRoom == 11 ? 1300 : 580); InitScreenWalls(); }
+        { _trPaintRoom = Math.Min(11, _trPaintRoom + 1); _trCameraPos = Vector2.Zero; _arena = new Rectangle(60, 80, 1160, _trPaintRoom == 11 ? 1300 : 580); InitScreenWalls(); InitAwakeningDoors(); }
         
         // Tab cycles palette sheet
         if (kb.IsKeyDown(Keys.Tab) && !_prevKb.IsKeyDown(Keys.Tab))
@@ -25471,6 +25474,16 @@ public class Game1 : Game
                 DrawRect(hx, hy + TSDst - 2, TSDst, 2, Color.Yellow);
                 DrawRect(hx, hy, 2, TSDst, Color.Yellow);
                 DrawRect(hx + TSDst - 2, hy, 2, TSDst, Color.Yellow);
+                
+                // Preview selected tile at cursor (semi-transparent)
+                if (_trSelectedTile >= 0 && _tsSheets[_trSelectedSheet] != null)
+                {
+                    int sheetCols = _tsSheets[_trSelectedSheet].Width / TS16;
+                    int pr = _trSelectedTile / sheetCols;
+                    int pc = _trSelectedTile % sheetCols;
+                    var src = new Rectangle(pc * TS16, pr * TS16, TS16, TS16);
+                    _spriteBatch.Draw(_tsSheets[_trSelectedSheet], new Rectangle(hx, hy, TSDst, TSDst), src, Color.White * 0.5f);
+                }
             }
         }
         
