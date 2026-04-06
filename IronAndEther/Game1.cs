@@ -792,8 +792,8 @@ public class Game1 : Game
     private float _swordTimer;         // counts down during swing
     private float _swordCooldown;      // cooldown between swings
     private const float SwordSwingTime = 0.25f;
-    private const float SwordCooldownTime = 0.4f;
-    private const float SwordRange = 55f;
+    private const float SwordCooldownTime = 0.25f;
+    private const float SwordRange = 40f;
     private const float SwordArc = MathF.PI / 2f; // 90° arc
     private const float SwordDamage = 6f;
     private const float SwordKnockback = 120f;
@@ -2465,8 +2465,6 @@ public class Game1 : Game
             _swordTimer = SwordSwingTime;
             _swordCooldown = SwordCooldownTime;
             _swordHitEnemies.Clear();
-            // Small lunge toward cursor
-            _playerPos += _swordDir * SwordLunge;
             PlaySfx(_sfxHit);
         }
         // Sword hit detection during swing
@@ -2489,6 +2487,12 @@ public class Game1 : Game
                 e.Hp -= SwordDamage;
                 e.HitFlash = 0.15f;
                 e.HitCooldown = 0.1f;
+                // Kill check
+                if (e.Hp <= 0)
+                {
+                    e.Alive = false;
+                    SpawnEtherDrops(e.Position, false);
+                }
                 // Stagger
                 if (e.Stagger < e.MaxStagger)
                     e.Stagger += SwordStagger;
