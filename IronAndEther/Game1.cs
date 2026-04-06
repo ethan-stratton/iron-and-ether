@@ -257,7 +257,10 @@ public class Game1 : Game
     private Rectangle _caveEntrance; // the entrance hitbox in the overworld
     private Rectangle _caveExit; // the exit hitbox inside the cave
     private float _caveTransitionTimer = 0f;
+    private const float CaveTransitionDuration = 0.6f;
     private bool _caveTransitionIn = false; // true = entering cave, false = exiting
+    private Vector2 _caveTransStartPos; // player pos when transition began
+    private float _caveTransScale = 1f; // player scale during cave transition
     
     // Awakening mode state
     private bool _awakeningIntroDone = false;
@@ -2899,7 +2902,7 @@ public class Game1 : Game
             int col = (_currentScreen - 1) % 3; // 0,1,2
             int row = (_currentScreen - 1) / 3; // 0,1,2
             bool transitioned = false;
-            float edge = PlayerSize / 2f; // transition triggers near arena edge
+            float edge = PlayerSize; // transition triggers at arena edge
             int prevScreen = _currentScreen;
             
             // Block screen transitions while inside Room 3 portal
@@ -16018,8 +16021,9 @@ public class Game1 : Game
             if (_caveEntrance.Contains((int)_playerPos.X, (int)_playerPos.Y))
             {
                 _caveReturnPos = new Vector2(_caveEntrance.Center.X, _caveEntrance.Bottom + 20);
+                _caveTransStartPos = _playerPos;
                 _caveTransitionIn = true;
-                _caveTransitionTimer = 0.4f;
+                _caveTransitionTimer = CaveTransitionDuration;
                 _roomNameDisplay = "The Cave";
                 _roomNameTimer = 3f;
             }
@@ -16096,8 +16100,9 @@ public class Game1 : Game
         {
             if (_caveExit.Contains((int)_playerPos.X, (int)_playerPos.Y))
             {
+                _caveTransStartPos = _playerPos;
                 _caveTransitionIn = false;
-                _caveTransitionTimer = 0.4f;
+                _caveTransitionTimer = CaveTransitionDuration;
                 _roomNameDisplay = AwakeningRoomNames[5];
                 _roomNameTimer = 3f;
             }
@@ -16253,9 +16258,56 @@ public class Game1 : Game
         // Black background (covers the arena)
         DrawRect(0, 0, ScreenW, ScreenH, new Color(5, 5, 8));
         
-        // Cave walls — dark stone
         var ca = _caveArea;
-        DrawRect(ca.X, ca.Y, ca.Width, ca.Height, new Color(18, 16, 20)); // floor
+        
+        // Painted tiles for cave (room 50) — draw at cave area position
+        bool caveTiled = _roomTileData.ContainsKey(50) || _roomTileOverlay.ContainsKey(50);
+        if (caveTiled)
+        {
+            var (caveCols, caveRows) = GetRoomTileSize(50);
+            var bg = _roomTileData.TryGetValue(50, out var bgD) ? bgD : null;
+            var fg = _roomTileOverlay.TryGetValue(50, out var fgD) ? fgD : null;
+            // Offset: cave tiles start at cave area origin
+            int ox = ca.X - TSDst; // 1 tile border
+            int oy = ca.Y - TSDst;
+            for (int r = 0; r < caveRows; r++)
+            {
+                for (int c = 0; c < caveCols; c++)
+                {
+                    int dx = ox + c * TSDst;
+                    int dy = oy + r * TSDst;
+                    // BG
+                    bool drewBg = false;
+                    if (bg != null && r < bg.GetLength(0) && c < bg.GetLength(1))
+                    {
+                        var (s, t) = bg[r, c];
+                        if (s >= 0 && t >= 0 && _tsSheets[s] != null)
+                        {
+                            int sc = _tsSheets[s].Width / TS16;
+                            _spriteBatch.Draw(_tsSheets[s], new Rectangle(dx, dy, TSDst, TSDst),
+                                new Rectangle((t % sc) * TS16, (t / sc) * TS16, TS16, TS16), Color.White);
+                            drewBg = true;
+                        }
+                    }
+                    if (!drewBg) DrawRect(dx, dy, TSDst, TSDst, new Color(18, 16, 20));
+                    // FG
+                    if (fg != null && r < fg.GetLength(0) && c < fg.GetLength(1))
+                    {
+                        var (s2, t2) = fg[r, c];
+                        if (s2 >= 0 && t2 >= 0 && _tsSheets[s2] != null)
+                        {
+                            int sc2 = _tsSheets[s2].Width / TS16;
+                            _spriteBatch.Draw(_tsSheets[s2], new Rectangle(dx, dy, TSDst, TSDst),
+                                new Rectangle((t2 % sc2) * TS16, (t2 / sc2) * TS16, TS16, TS16), Color.White);
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Fallback procedural cave
+            DrawRect(ca.X, ca.Y, ca.Width, ca.Height, new Color(18, 16, 20)); // floor
         
         // Wall borders — rough stone look
         int wallThick = 12;
@@ -16290,9 +16342,12 @@ public class Game1 : Game
                 DrawRect((int)(x - rayW / 2), (int)y, (int)rayW, 2, new Color(255, 240, 200) * a);
             }
         }
+        } // end else (non-tiled cave)
         
         // Exit label
-        DrawTextOutlined(lightCX - MeasureText("EXIT", 0.7f) / 2, lightCY + 4, "EXIT", new Color(200, 180, 140) * 0.6f, Color.Black * 0.3f, 0.7f);
+        int lightCX2 = _caveExit.Center.X;
+        int lightCY2 = ca.Bottom;
+        DrawTextOutlined(lightCX2 - MeasureText("EXIT", 0.7f) / 2, lightCY2 + 4, "EXIT", new Color(200, 180, 140) * 0.6f, Color.Black * 0.3f, 0.7f);
         
         // ═══ Cracked Wall / Secret Alcove ═══
         float time = _totalTime;
@@ -21207,11 +21262,33 @@ public class Game1 : Game
         }
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: cameraMatrix);
 
-        // Cave transition fade
+        // Cave transition animation
         if (_caveTransitionTimer > 0)
         {
-            float t = _caveTransitionTimer / 0.4f;
-            DrawRect(0, 0, ScreenW, ScreenH, Color.Black * (1f - t));
+            float t = _caveTransitionTimer / CaveTransitionDuration; // 1→0
+            float fadeProgress = 1f - t; // 0→1
+            
+            if (_caveTransitionIn)
+            {
+                // Walking into cave: player moves toward cave center, shrinks, screen darkens
+                Vector2 caveCenter = new Vector2(_caveEntrance.Center.X, _caveEntrance.Center.Y);
+                _playerPos = Vector2.Lerp(caveCenter, _caveTransStartPos, t);
+                // Shrink player (drawn smaller via scale)
+                _caveTransScale = MathHelper.Lerp(0.2f, 1f, t);
+            }
+            else
+            {
+                // Exiting cave: screen lightens, player grows from cave exit
+                Vector2 exitTarget = _caveReturnPos;
+                _playerPos = Vector2.Lerp(exitTarget, _caveTransStartPos, t);
+                _caveTransScale = MathHelper.Lerp(1f, 0.2f, t);
+            }
+            
+            DrawRect(0, 0, ScreenW, ScreenH, Color.Black * fadeProgress);
+        }
+        else
+        {
+            _caveTransScale = 1f;
         }
         
         if (_inCave)
@@ -24957,6 +25034,7 @@ public class Game1 : Game
     
     private (int cols, int rows) GetRoomTileSize(int room)
     {
+        if (room == 50) return (9, 7); // Room 5b (cave interior): 400×300 → 9×7 tiles
         // Full screen width always 1280. Height depends on room
         int totalW = 1280; // ScreenW
         int totalH = room == 11 ? (80 + 1300 + 80) : 720; // Room 11: top margin + tall arena + bottom
@@ -25207,10 +25285,24 @@ public class Game1 : Game
         _trCameraPos.Y = MathHelper.Clamp(_trCameraPos.Y, 0, maxCY);
         
         // Left/Right to switch rooms
+        // Room cycling: 1-11 then 50 (cave)
+        int[] paintRooms = { 1, 2, 3, 4, 5, 50, 6, 7, 8, 9, 11 };
         if (kb.IsKeyDown(Keys.Left) && !_prevKb.IsKeyDown(Keys.Left))
-        { _trPaintRoom = Math.Max(1, _trPaintRoom - 1); _trCameraPos = Vector2.Zero; _arena = new Rectangle(60, 80, 1160, _trPaintRoom == 11 ? 1300 : 580); InitScreenWalls(); InitAwakeningDoors(); }
+        {
+            int idx = Array.IndexOf(paintRooms, _trPaintRoom);
+            if (idx > 0) _trPaintRoom = paintRooms[idx - 1];
+            _trCameraPos = Vector2.Zero;
+            _arena = new Rectangle(60, 80, 1160, _trPaintRoom == 11 ? 1300 : 580);
+            InitScreenWalls(); InitAwakeningDoors();
+        }
         if (kb.IsKeyDown(Keys.Right) && !_prevKb.IsKeyDown(Keys.Right))
-        { _trPaintRoom = Math.Min(11, _trPaintRoom + 1); _trCameraPos = Vector2.Zero; _arena = new Rectangle(60, 80, 1160, _trPaintRoom == 11 ? 1300 : 580); InitScreenWalls(); InitAwakeningDoors(); }
+        {
+            int idx = Array.IndexOf(paintRooms, _trPaintRoom);
+            if (idx < paintRooms.Length - 1) _trPaintRoom = paintRooms[idx + 1];
+            _trCameraPos = Vector2.Zero;
+            _arena = new Rectangle(60, 80, 1160, _trPaintRoom == 11 ? 1300 : 580);
+            InitScreenWalls(); InitAwakeningDoors();
+        }
         
         // Tab cycles palette sheet
         if (kb.IsKeyDown(Keys.Tab) && !_prevKb.IsKeyDown(Keys.Tab))
@@ -25629,7 +25721,8 @@ public class Game1 : Game
         DrawRect(0, 0, ScreenW, 50, new Color(15, 15, 20, 230));
         string layerStr = _trActiveLayer == 0 ? "BG" : "FG";
         string selStr = _trSelectedTile >= 0 ? $"{_tsNames[_trSelectedSheet]}#{_trSelectedTile}" : "ERASER";
-        string header = $"PAINT — Room {_trPaintRoom} ({roomCols}×{roomRows})  |  Layer: {layerStr}  |  Tile: {selStr}  |  Palette: {_tsNames[_trSheetIdx]}";
+        string roomLabel = _trPaintRoom == 50 ? "5b (Cave)" : _trPaintRoom.ToString();
+        string header = $"PAINT — Room {roomLabel} ({roomCols}×{roomRows})  |  Layer: {layerStr}  |  Tile: {selStr}  |  Palette: {_tsNames[_trSheetIdx]}";
         DrawTextOutlined(10, 6, header, new Color(200, 170, 100), Color.Black, 0.9f);
         string controls = "WASD:pan  L/R:room  TAB:sheet  L:layer  Click:paint  RClick:erase  X:eraser  F:fill  G:overlay  Ctrl+S:save  ESC:back";
         DrawTextOutlined(10, 28, controls, new Color(100, 100, 120), Color.Black, 0.65f);
@@ -25750,6 +25843,15 @@ public class Game1 : Game
     
     private void DrawPlayer(Vector2 pos, Vector2 aimDir, Color tint, float gameTime, Color essenceColor, float jumpHeight = 0f)
     {
+        // During cave transition, draw scaled silhouette instead of full player
+        if (_caveTransScale < 0.95f)
+        {
+            float s = _caveTransScale;
+            int sz = (int)(PlayerSize * s);
+            DrawRect((int)(pos.X - sz / 2), (int)(pos.Y - sz / 2), sz, sz, tint * s);
+            return;
+        }
+        
         int bx = (int)(pos.X - 8);
         int by = (int)(pos.Y - 8);
         
