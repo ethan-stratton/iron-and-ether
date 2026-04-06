@@ -11,7 +11,7 @@ using Microsoft.Xna.Framework.Input;
 namespace IronAndEther;
 
 public enum GameState { Intro, TitleScreen, ModeSelect, Playing, Paused, GameOver, DemoComplete }
-public enum GameMode { Campaign, Gauntlet, Awakening }
+public enum GameMode { Campaign, Gauntlet, Awakening, TileRenderer }
 
 public class Game1 : Game
 {
@@ -24,6 +24,14 @@ public class Game1 : Game
     
     // Tilemap rendering
     private Texture2D _tileset;
+    // OpenRPG tilesets (16×16 base, 480×256 sheets, CC0)
+    private Texture2D _tsDungeon, _tsExterior, _tsInterior, _tsShip, _tsWorld;
+    private Texture2D[] _tsSheets;  // indexed array for easy access
+    private string[] _tsNames = { "dungeon", "exterior", "interior", "ship", "world" };
+    private const int TS16 = 16; // source tile size for OpenRPG tilesets
+    private int _trScale = 3;    // display scale for tile renderer (adjustable)
+    private int _trSheetIdx = 0; // which sheet we're viewing
+    private Vector2 _trCameraPos; // camera position in tile renderer mode
     private const int TileSrc = 12; // source tile size in tileset
     private const int TileScale = 3; // display scale
     private const int TileDst = TileSrc * TileScale; // 36px displayed
@@ -1416,6 +1424,37 @@ public class Game1 : Game
             System.Console.WriteLine("Tileset not found — using rectangle fallback.");
         }
 
+        // Load OpenRPG tilesets
+        _tsSheets = new Texture2D[5];
+        for (int i = 0; i < _tsNames.Length; i++)
+        {
+            string tsPath = System.IO.Path.Combine(Content.RootDirectory, "openRPG_Tilesets_5", _tsNames[i] + ".png");
+            if (System.IO.File.Exists(tsPath))
+            {
+                using var tsStream = System.IO.File.OpenRead(tsPath);
+                var tex = Texture2D.FromStream(GraphicsDevice, tsStream);
+                _tsSheets[i] = tex;
+                // Premultiply alpha and mask out pink (255,0,255) background
+                var pixels = new Color[tex.Width * tex.Height];
+                tex.GetData(pixels);
+                for (int p = 0; p < pixels.Length; p++)
+                {
+                    if (pixels[p].R >= 250 && pixels[p].G <= 5 && pixels[p].B >= 250)
+                        pixels[p] = Color.Transparent;
+                    else
+                        pixels[p] = new Color(
+                            (int)(pixels[p].R * pixels[p].A / 255f),
+                            (int)(pixels[p].G * pixels[p].A / 255f),
+                            (int)(pixels[p].B * pixels[p].A / 255f),
+                            pixels[p].A);
+                }
+                tex.SetData(pixels);
+                System.Console.WriteLine($"OpenRPG tileset '{_tsNames[i]}' loaded: {tex.Width}x{tex.Height}");
+            }
+        }
+        _tsDungeon = _tsSheets[0]; _tsExterior = _tsSheets[1]; _tsInterior = _tsSheets[2];
+        _tsShip = _tsSheets[3]; _tsWorld = _tsSheets[4];
+
         _playerPos = new Vector2(_arena.Center.X, _arena.Center.Y);
         _undinePos = _playerPos + new Vector2(20, -10);
         _wandPickupPos = _playerPos + new Vector2(60, 0);
@@ -1624,6 +1663,16 @@ public class Game1 : Game
         }
         
         // ═══════════════ GAMEPLAY UPDATE (state == Playing) ═══════════════
+        
+        // Tile Renderer mode — separate update loop
+        if (_gameMode == GameMode.TileRenderer)
+        {
+            UpdateTileRenderer(kb, mouse, dt);
+            _prevKb = kb;
+            _prevMouse = mouse;
+            base.Update(gameTime);
+            return;
+        }
         
         // Text box blocks all other input
         if (_textBoxMessage != null)
@@ -10692,6 +10741,13 @@ public class Game1 : Game
                         _state = GameState.Playing;
                         break;
                     case 3:
+                        _gameMode = GameMode.TileRenderer;
+                        _trSheetIdx = 0;
+                        _trCameraPos = Vector2.Zero;
+                        _trScale = 3;
+                        _state = GameState.Playing;
+                        break;
+                    case 4:
                         Exit();
                         break;
                 }
@@ -10702,14 +10758,14 @@ public class Game1 : Game
 
         if ((kb.IsKeyDown(Keys.Up) && !_prevKb.IsKeyDown(Keys.Up)) ||
             (kb.IsKeyDown(Keys.W) && !_prevKb.IsKeyDown(Keys.W)))
-            _menuSelection = (_menuSelection - 1 + 4) % 4;
+            _menuSelection = (_menuSelection - 1 + 5) % 5;
         if ((kb.IsKeyDown(Keys.Down) && !_prevKb.IsKeyDown(Keys.Down)) ||
             (kb.IsKeyDown(Keys.S) && !_prevKb.IsKeyDown(Keys.S)))
-            _menuSelection = (_menuSelection + 1) % 4;
+            _menuSelection = (_menuSelection + 1) % 5;
             
         if (kb.IsKeyDown(Keys.Enter) && !_prevKb.IsKeyDown(Keys.Enter))
         {
-            if (_menuSelection == 3) { Exit(); return; }
+            if (_menuSelection == 4) { Exit(); return; }
             _menuFlashTimer = 0.8f;
             _menuFlashSelection = _menuSelection;
             _menuTransitioning = true;
@@ -20871,6 +20927,14 @@ public class Game1 : Game
                 return;
         }
         
+        // Tile Renderer mode — separate draw
+        if (_gameMode == GameMode.TileRenderer)
+        {
+            DrawTileRenderer(gameTime);
+            FinalizeFrame();
+            return;
+        }
+        
         // Playing or Paused — draw game world
         var cameraMatrix = Matrix.CreateTranslation(_transitionOffset.X + _shakeX - _cameraOffset.X, _transitionOffset.Y + _shakeY - _cameraOffset.Y, 0);
         // BREAK Finisher zoom
@@ -24614,6 +24678,131 @@ public class Game1 : Game
         DrawPixelCursor();
     }
     
+    // ═══════════════ TILE RENDERER MODE ═══════════════
+    
+    private void UpdateTileRenderer(KeyboardState kb, MouseState mouse, float dt)
+    {
+        float speed = 300f * dt;
+        if (kb.IsKeyDown(Keys.LeftShift)) speed *= 3f;
+        if (kb.IsKeyDown(Keys.W) || kb.IsKeyDown(Keys.Up)) _trCameraPos.Y -= speed;
+        if (kb.IsKeyDown(Keys.S) || kb.IsKeyDown(Keys.Down)) _trCameraPos.Y += speed;
+        if (kb.IsKeyDown(Keys.A) || kb.IsKeyDown(Keys.Left)) _trCameraPos.X -= speed;
+        if (kb.IsKeyDown(Keys.D) || kb.IsKeyDown(Keys.Right)) _trCameraPos.X += speed;
+        
+        // Tab cycles through sheets
+        if (kb.IsKeyDown(Keys.Tab) && !_prevKb.IsKeyDown(Keys.Tab))
+            _trSheetIdx = (_trSheetIdx + 1) % 5;
+        
+        // +/- to adjust scale
+        if (kb.IsKeyDown(Keys.OemPlus) && !_prevKb.IsKeyDown(Keys.OemPlus) && _trScale < 8)
+            _trScale++;
+        if (kb.IsKeyDown(Keys.OemMinus) && !_prevKb.IsKeyDown(Keys.OemMinus) && _trScale > 1)
+            _trScale--;
+        
+        // Escape to return to menu
+        if (kb.IsKeyDown(Keys.Escape) && !_prevKb.IsKeyDown(Keys.Escape))
+        {
+            _state = GameState.ModeSelect;
+            _menuSelection = 0;
+        }
+        
+        // Clamp camera so you can't scroll infinitely
+        if (_trCameraPos.X < 0) _trCameraPos.X = 0;
+        if (_trCameraPos.Y < 0) _trCameraPos.Y = 0;
+        var sheet = _tsSheets != null && _trSheetIdx < _tsSheets.Length ? _tsSheets[_trSheetIdx] : null;
+        if (sheet != null)
+        {
+            int sheetDispW = sheet.Width / TS16 * (TS16 * _trScale);
+            int sheetDispH = sheet.Height / TS16 * (TS16 * _trScale);
+            if (_trCameraPos.X > MathF.Max(0, sheetDispW - ScreenW + 40)) _trCameraPos.X = MathF.Max(0, sheetDispW - ScreenW + 40);
+            if (_trCameraPos.Y > MathF.Max(0, sheetDispH - ScreenH + 100)) _trCameraPos.Y = MathF.Max(0, sheetDispH - ScreenH + 100);
+        }
+    }
+    
+    private void DrawTileRenderer(GameTime gameTime)
+    {
+        GraphicsDevice.Clear(new Color(20, 20, 25));
+        
+        var sheet = _tsSheets != null && _trSheetIdx < _tsSheets.Length ? _tsSheets[_trSheetIdx] : null;
+        
+        _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+        
+        if (sheet == null)
+        {
+            DrawTextCenteredOutlined(ScreenH / 2, "No tileset loaded.", Color.Red, Color.Black);
+            _spriteBatch.End();
+            return;
+        }
+        
+        int dst = TS16 * _trScale; // display size of each tile
+        int cols = sheet.Width / TS16;
+        int rows = sheet.Height / TS16;
+        int ox = 20 - (int)_trCameraPos.X; // left margin + camera offset
+        int oy = 60 - (int)_trCameraPos.Y; // top margin for header + camera offset
+        
+        // Draw each tile with a 1px gap for readability
+        int gap = 1;
+        for (int r = 0; r < rows; r++)
+        {
+            for (int c = 0; c < cols; c++)
+            {
+                int dx = ox + c * (dst + gap);
+                int dy = oy + r * (dst + gap);
+                
+                // Cull off-screen tiles
+                if (dx + dst < 0 || dx > ScreenW || dy + dst < 0 || dy > ScreenH) continue;
+                
+                // Draw dark background square so transparent tiles are visible
+                DrawRect(dx, dy, dst, dst, new Color(40, 40, 50));
+                
+                // Draw the tile
+                var src = new Rectangle(c * TS16, r * TS16, TS16, TS16);
+                _spriteBatch.Draw(sheet, new Rectangle(dx, dy, dst, dst), src, Color.White);
+            }
+        }
+        
+        // Mouse hover — show tile ID and source rect
+        var mouse = Mouse.GetState();
+        int mx = mouse.X + (int)_trCameraPos.X - 20;
+        int my = mouse.Y + (int)_trCameraPos.Y - 60;
+        int hc = mx / (dst + gap);
+        int hr = my / (dst + gap);
+        
+        if (hc >= 0 && hc < cols && hr >= 0 && hr < rows && mx >= 0 && my >= 0)
+        {
+            // Highlight hovered tile
+            int hx = ox + hc * (dst + gap);
+            int hy = oy + hr * (dst + gap);
+            // Draw yellow border
+            DrawRect(hx - 2, hy - 2, dst + 4, 2, Color.Yellow);      // top
+            DrawRect(hx - 2, hy + dst, dst + 4, 2, Color.Yellow);     // bottom
+            DrawRect(hx - 2, hy, 2, dst, Color.Yellow);               // left
+            DrawRect(hx + dst, hy, 2, dst, Color.Yellow);             // right
+            
+            int tileId = hr * cols + hc;
+            string info = $"ID:{tileId}  Row:{hr} Col:{hc}  Src:({hc * TS16},{hr * TS16})  {TS16}x{TS16}";
+            
+            // Draw info tooltip near mouse
+            int tw = MeasureText(info, 0.8f);
+            int tx = mouse.X + 16;
+            int ty = mouse.Y - 24;
+            if (tx + tw > ScreenW - 10) tx = mouse.X - tw - 16;
+            if (ty < 4) ty = mouse.Y + 20;
+            DrawRect(tx - 4, ty - 2, tw + 8, 20, new Color(0, 0, 0, 200));
+            DrawTextOutlined(tx, ty, info, Color.Yellow, Color.Black, 0.8f);
+        }
+        
+        // Header
+        DrawRect(0, 0, ScreenW, 50, new Color(15, 15, 20, 230));
+        string header = $"TILE RENDERER — {_tsNames[_trSheetIdx].ToUpper()} ({cols}×{rows} tiles, {TS16}×{TS16}px)  Scale:{_trScale}×";
+        DrawTextOutlined(20, 8, header, new Color(200, 170, 100), Color.Black, 1f);
+        string controls = "TAB:sheet  +/-:scale  WASD:pan  Shift:fast  ESC:back";
+        DrawTextOutlined(20, 28, controls, new Color(100, 100, 120), Color.Black, 0.7f);
+        
+        _spriteBatch.End();
+        DrawPixelCursor();
+    }
+    
     private void DrawModeSelect(GameTime gameTime)
     {
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
@@ -24621,11 +24810,12 @@ public class Game1 : Game
         
         DrawTextCenteredOutlined(160, "SELECT MODE", new Color(200, 170, 100), Color.Black, 2f, tf, 2);
         
-        string[] options = { "The Awakening", "Campaign", "Gauntlet", "Quit" };
+        string[] options = { "The Awakening", "Campaign", "Gauntlet", "Tile Renderer", "Quit" };
         string[] descs = {
             "A guided journey. Discover your power.",
             "Explore the world. Uncover the myth.",
             "Endless waves. How long can you last?",
+            "Browse and inspect tilesets.",
             "Return to the void."
         };
         
