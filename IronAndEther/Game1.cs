@@ -1468,13 +1468,12 @@ public class Game1 : Game
                 using var tsStream = System.IO.File.OpenRead(tsPath);
                 var tex = Texture2D.FromStream(GraphicsDevice, tsStream);
                 _tsSheets[i] = tex;
-                // Read top-left pixel as transparency key (RPG Maker 2K/3 convention)
+                // Mask out transparency key color (255,103,139) used by these RPG Maker tilesets
                 var pixels = new Color[tex.Width * tex.Height];
                 tex.GetData(pixels);
-                Color transKey = pixels[0]; // top-left pixel = transparent color
                 for (int p = 0; p < pixels.Length; p++)
                 {
-                    if (pixels[p].R == transKey.R && pixels[p].G == transKey.G && pixels[p].B == transKey.B)
+                    if (pixels[p].R == 255 && pixels[p].G == 103 && pixels[p].B == 139)
                         pixels[p] = Color.Transparent;
                     else
                         pixels[p] = new Color(
@@ -10884,11 +10883,11 @@ public class Game1 : Game
         int ay = _arena.Top;
         
         // Cave entrance hitbox — the dark opening at the bottom of the cave structure
-        _caveEntrance = new Rectangle(ax + 316, ay + 196, 48, 48);
+        _caveEntrance = new Rectangle(ax + 268, ay + 148, 48, 48);
         
         // Cave interior area (takes over the whole arena when inside)
         int caveW = 400, caveH = 300;
-        int caveCX = ax + 340, caveCY = ay + 220;
+        int caveCX = ax + 292, caveCY = ay + 172;
         _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
         
         // Cave exit — at the bottom of the cave, light rays
@@ -10952,9 +10951,9 @@ public class Game1 : Game
         int ay = _arena.Top;
         _inCave = false;
         
-        _caveEntrance = new Rectangle(ax + 316, ay + 196, 48, 48);
+        _caveEntrance = new Rectangle(ax + 268, ay + 148, 48, 48);
         int caveW = 400, caveH = 300;
-        int caveCX = ax + 340, caveCY = ay + 220;
+        int caveCX = ax + 292, caveCY = ay + 172;
         _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
         _caveExit = new Rectangle(caveCX - 30, caveCY + caveH / 2 - 20, 60, 20);
         
@@ -17530,11 +17529,10 @@ public class Game1 : Game
         _screenWalls[5] = new List<Rectangle>
         {
             // Cave structure — aligned to tile grid (48px cells)
-            // Cave walls: 3 tiles wide × 3 tiles tall centered around the cave tiles
-            new(ax + 280, ay + 100, 48, 144),  // left wall (1 tile wide × 3 tall)
-            new(ax + 280, ay + 100, 144, 48),  // roof (3 tiles wide × 1 tall)
-            new(ax + 376, ay + 100, 48, 144),  // right wall
-            new(ax + 820, ay + 180, 48, 48),   // right pillar (1 tile)
+            new(ax + 232, ay + 52, 48, 144),   // left wall
+            new(ax + 232, ay + 52, 144, 48),   // roof
+            new(ax + 328, ay + 52, 48, 144),   // right wall
+            new(ax + 820, ay + 180, 48, 48),   // right pillar
         };
         
         // Screen 4 (The Knight's Hall): great hall with pillars and space for sigils
@@ -25096,9 +25094,9 @@ public class Game1 : Game
                 InitScreenWalls();
                 // Set up cave data for room 5
                 int ax = _arena.Left, ay = _arena.Top;
-                _caveEntrance = new Rectangle(ax + 316, ay + 196, 48, 48);
+                _caveEntrance = new Rectangle(ax + 268, ay + 148, 48, 48);
                 int caveW = 400, caveH = 300;
-                int caveCX = ax + 340, caveCY = ay + 220;
+                int caveCX = ax + 292, caveCY = ay + 172;
                 _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
             }
         }
