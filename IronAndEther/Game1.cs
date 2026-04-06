@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Media;
@@ -30,8 +31,8 @@ public class Game1 : Game
     private string[] _tsNames = { "dungeon", "exterior", "interior", "ship", "world" };
     private const int TS16 = 16; // source tile size for OpenRPG tilesets
     private const int TSDst = 48; // display size (16 × 3)
-    private const int TSRoomCols = 25; // 1160 / 48 = 24.2, round up to 25
-    private const int TSRoomRows = 28; // max rows (Room 11 is 1300/48 ≈ 28)
+    private const int TSRoomCols = 27; // 1280 / 48 = 26.7, round up
+    private const int TSRoomRows = 30; // max rows (Room 11 needs ~30 for full height + borders)
     private int _trScale = 3;    // display scale for tile renderer (adjustable)
     private int _trSheetIdx = 0; // which sheet we're viewing
     private Vector2 _trCameraPos; // camera position in tile renderer mode
@@ -16959,11 +16960,11 @@ public class Game1 : Game
             {
                 for (int c = 0; c < roomCols; c++)
                 {
-                    int dx = area.X + c * TSDst;
-                    int dy = area.Y + r * TSDst;
-                    int drawW = Math.Min(TSDst, area.Right - dx);
-                    int drawH = Math.Min(TSDst, area.Bottom - dy);
-                    if (drawW <= 0 || drawH <= 0) continue;
+                    int dx = c * TSDst; // from screen origin (0,0)
+                    int dy = r * TSDst;
+                    int drawW = TSDst;
+                    int drawH = TSDst;
+                    if (r >= TSRoomRows || c >= TSRoomCols) continue;
                     
                     var (s, t) = painted[r, c];
                     if (s >= 0 && t >= 0 && _tsSheets[s] != null)
@@ -16972,12 +16973,6 @@ public class Game1 : Game
                         int tr2 = t / sheetCols;
                         int tc2 = t % sheetCols;
                         var src = new Rectangle(tc2 * TS16, tr2 * TS16, TS16, TS16);
-                        if (drawW < TSDst || drawH < TSDst)
-                        {
-                            float fw = (float)drawW / TSDst;
-                            float fh = (float)drawH / TSDst;
-                            src = new Rectangle(src.X, src.Y, (int)(16 * fw), (int)(16 * fh));
-                        }
                         _spriteBatch.Draw(_tsSheets[s], new Rectangle(dx, dy, drawW, drawH), src, Color.White);
                     }
                     else
@@ -21201,10 +21196,16 @@ public class Game1 : Game
             int pad = 200;
             DrawRect(_arena.Left - pad, _arena.Top - pad, _arena.Width + pad * 2, _arena.Height + pad * 2, new Color(10, 10, 15));
         }
-        DrawRect(_arena.Left - 2, _arena.Top - 2, _arena.Width + 4, _arena.Height + 4, new Color(40, 40, 50));
+        if (!_roomTileData.ContainsKey(_currentScreen))
+            DrawRect(_arena.Left - 2, _arena.Top - 2, _arena.Width + 4, _arena.Height + 4, new Color(40, 40, 50));
         // Tiled floor (replaces flat color if tilesets loaded)
         if (_tsDungeon != null)
-            DrawTiledFloor(_arena);
+        {
+            if (_roomTileData.ContainsKey(_currentScreen))
+                DrawTiledFloor(new Rectangle(0, 0, ScreenW, _arena.Bottom + 80)); // full screen for painted rooms
+            else
+                DrawTiledFloor(_arena); // just arena for auto-tiled
+        }
         else
             DrawRect(_arena.Left, _arena.Top, _arena.Width, _arena.Height, new Color(15, 15, 20));
         
@@ -21221,8 +21222,8 @@ public class Game1 : Game
                 }
         }
 
-        // Walls
-        if (_screenWalls.TryGetValue(_currentScreen, out var drawWalls))
+        // Walls (skip flat rects when room has painted tile data)
+        if (!_roomTileData.ContainsKey(_currentScreen) && _screenWalls.TryGetValue(_currentScreen, out var drawWalls))
         {
             foreach (var wall in drawWalls)
             {
@@ -24921,10 +24922,10 @@ public class Game1 : Game
     
     private (int cols, int rows) GetRoomTileSize(int room)
     {
-        // Room 11 is 1160×1300, others are 1160×580
-        int arenaW = 1160;
-        int arenaH = room == 11 ? 1300 : 580;
-        return ((arenaW + TSDst - 1) / TSDst, (arenaH + TSDst - 1) / TSDst);
+        // Full screen width always 1280. Height depends on room
+        int totalW = 1280; // ScreenW
+        int totalH = room == 11 ? (80 + 1300 + 80) : 720; // Room 11: top margin + tall arena + bottom
+        return ((totalW + TSDst - 1) / TSDst, (totalH + TSDst - 1) / TSDst);
     }
     
     private (int sheet, int tile)[,] GetOrCreateRoomTiles(int room)
@@ -24942,115 +24943,76 @@ public class Game1 : Game
     
     private void SaveRoomTiles()
     {
-        // Save all room tile data to JSON file
-        var sb = new System.Text.StringBuilder();
-        sb.AppendLine("{");
-        bool firstRoom = true;
+        var dict = new Dictionary<string, int?[][]>();
         foreach (var kvp in _roomTileData)
         {
-            if (!firstRoom) sb.AppendLine(",");
-            firstRoom = false;
-            sb.Append($"  \"{kvp.Key}\": [");
             var data = kvp.Value;
-            for (int r = 0; r < data.GetLength(0); r++)
+            int rows = data.GetLength(0);
+            int cols = data.GetLength(1);
+            var arr = new int?[rows][];
+            for (int r = 0; r < rows; r++)
             {
-                if (r > 0) sb.Append(",");
-                sb.Append("\n    [");
-                for (int c = 0; c < data.GetLength(1); c++)
+                // Each row stores flat pairs: [sheet,tile, sheet,tile, ...] or null,null for empty
+                var row = new int?[cols * 2];
+                for (int c = 0; c < cols; c++)
                 {
-                    if (c > 0) sb.Append(",");
                     var (s, t) = data[r, c];
-                    if (s < 0) sb.Append("null");
-                    else sb.Append($"[{s},{t}]");
+                    if (s >= 0)
+                    {
+                        row[c * 2] = s;
+                        row[c * 2 + 1] = t;
+                    }
+                    else
+                    {
+                        row[c * 2] = null;
+                        row[c * 2 + 1] = null;
+                    }
                 }
-                sb.Append("]");
+                arr[r] = row;
             }
-            sb.Append("\n  ]");
+            dict[kvp.Key.ToString()] = arr;
         }
-        sb.AppendLine("\n}");
-        string path = System.IO.Path.Combine(Content.RootDirectory, "room_tiles.json");
-        System.IO.File.WriteAllText(path, sb.ToString());
-        System.Console.WriteLine($"Saved room tiles to {path}");
+        string json = JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = false });
+        string path = Path.Combine(Content.RootDirectory, "room_tiles.json");
+        File.WriteAllText(path, json);
+        System.Console.WriteLine($"Saved room tiles to {path} ({_roomTileData.Count} rooms)");
     }
     
     private void LoadRoomTiles()
     {
-        string path = System.IO.Path.Combine(Content.RootDirectory, "room_tiles.json");
-        if (!System.IO.File.Exists(path)) return;
+        string path = Path.Combine(Content.RootDirectory, "room_tiles.json");
+        if (!File.Exists(path)) return;
         try
         {
-            string json = System.IO.File.ReadAllText(path);
-            // Minimal JSON parser for our format
+            string json = File.ReadAllText(path);
+            var dict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
             _roomTileData.Clear();
-            // Find each room key
-            int pos = 0;
-            while (pos < json.Length)
+            foreach (var kvp in dict)
             {
-                int keyStart = json.IndexOf('"', pos);
-                if (keyStart < 0) break;
-                int keyEnd = json.IndexOf('"', keyStart + 1);
-                if (keyEnd < 0) break;
-                int roomNum = int.Parse(json.Substring(keyStart + 1, keyEnd - keyStart - 1));
-                
-                // Find the outer [ for this room's data
-                int arrStart = json.IndexOf('[', keyEnd);
-                if (arrStart < 0) break;
+                int roomNum = int.Parse(kvp.Key);
+                var rowsArr = kvp.Value;
+                int rowCount = rowsArr.GetArrayLength();
+                // Determine cols from first row
+                int colCount = rowCount > 0 ? rowsArr[0].GetArrayLength() / 2 : TSRoomCols;
                 
                 var data = new (int sheet, int tile)[TSRoomRows, TSRoomCols];
                 for (int r = 0; r < TSRoomRows; r++)
                     for (int c = 0; c < TSRoomCols; c++)
                         data[r, c] = (-1, -1);
                 
-                int row = 0;
-                int scanPos = arrStart + 1;
-                while (row < TSRoomRows && scanPos < json.Length)
+                for (int r = 0; r < Math.Min(rowCount, TSRoomRows); r++)
                 {
-                    int rowStart = json.IndexOf('[', scanPos);
-                    if (rowStart < 0) break;
-                    int rowEnd = json.IndexOf(']', rowStart);
-                    if (rowEnd < 0) break;
-                    
-                    string rowStr = json.Substring(rowStart + 1, rowEnd - rowStart - 1);
-                    int col = 0;
-                    int rp = 0;
-                    while (col < TSRoomCols && rp < rowStr.Length)
+                    var row = rowsArr[r];
+                    int pairs = row.GetArrayLength() / 2;
+                    for (int c = 0; c < Math.Min(pairs, TSRoomCols); c++)
                     {
-                        // Skip whitespace and commas
-                        while (rp < rowStr.Length && (rowStr[rp] == ' ' || rowStr[rp] == ',')) rp++;
-                        if (rp >= rowStr.Length) break;
-                        
-                        if (rowStr[rp] == 'n') // null
-                        {
-                            data[row, col] = (-1, -1);
-                            rp += 4; // skip "null"
-                        }
-                        else if (rowStr[rp] == '[')
-                        {
-                            int cellEnd = rowStr.IndexOf(']', rp);
-                            string cellStr = rowStr.Substring(rp + 1, cellEnd - rp - 1);
-                            var parts = cellStr.Split(',');
-                            data[row, col] = (int.Parse(parts[0]), int.Parse(parts[1]));
-                            rp = cellEnd + 1;
-                        }
-                        else rp++;
-                        col++;
+                        var sElem = row[c * 2];
+                        var tElem = row[c * 2 + 1];
+                        if (sElem.ValueKind == JsonValueKind.Number && tElem.ValueKind == JsonValueKind.Number)
+                            data[r, c] = (sElem.GetInt32(), tElem.GetInt32());
                     }
-                    row++;
-                    scanPos = rowEnd + 1;
                 }
-                
                 _roomTileData[roomNum] = data;
-                // Skip past this room's closing ]
-                // Find matching ] for the outer array
-                int depth = 1;
-                int skip = arrStart + 1;
-                while (skip < json.Length && depth > 0)
-                {
-                    if (json[skip] == '[') depth++;
-                    else if (json[skip] == ']') depth--;
-                    skip++;
-                }
-                pos = skip;
             }
             System.Console.WriteLine($"Loaded room tiles ({_roomTileData.Count} rooms)");
         }
@@ -25359,7 +25321,7 @@ public class Game1 : Game
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
         
         int palW = 200;
-        int gridX = palW + 10 - (int)_trCameraPos.X;
+        int gridX = palW + 10 - (int)_trCameraPos.X; // grid starts at screen origin (0,0)
         int gridY = 60 - (int)_trCameraPos.Y;
         var (roomCols, roomRows) = GetRoomTileSize(_trPaintRoom);
         
