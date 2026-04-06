@@ -682,7 +682,7 @@ public class Game1 : Game
 
     private Vector2 _playerPos;
     private const float PlayerSpeed = 250f;
-    private const float PlayerSize = 16f;
+    private const float PlayerSize = 20f;
     private float _playerHp = 100f;
     private int _timesFallen = 0;
     private const float PlayerMaxHp = 100f;
@@ -2803,8 +2803,8 @@ public class Game1 : Game
             }
         }
         
-        // Wall collision (push player out of walls)
-        if (_screenWalls.TryGetValue(_currentScreen, out var walls))
+        // Wall collision (push player out of walls) — skip when inside cave
+        if (!_inCave && _screenWalls.TryGetValue(_currentScreen, out var walls))
         {
             var playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2), (int)PlayerSize, (int)PlayerSize);
             foreach (var wall in walls)
@@ -2899,7 +2899,7 @@ public class Game1 : Game
             int col = (_currentScreen - 1) % 3; // 0,1,2
             int row = (_currentScreen - 1) / 3; // 0,1,2
             bool transitioned = false;
-            float edge = PlayerSize;
+            float edge = PlayerSize / 2f; // transition triggers near arena edge
             int prevScreen = _currentScreen;
             
             // Block screen transitions while inside Room 3 portal
@@ -16988,18 +16988,6 @@ public class Game1 : Game
                         }
                     }
                     if (!drewBg) DrawRect(dx, dy, TSDst, TSDst, new Color(15, 15, 20));
-                    
-                    // Foreground/overlay layer
-                    if (fg != null)
-                    {
-                        var (s2, t2) = fg[r, c];
-                        if (s2 >= 0 && t2 >= 0 && _tsSheets[s2] != null)
-                        {
-                            int sheetCols2 = _tsSheets[s2].Width / TS16;
-                            var src2 = new Rectangle((t2 % sheetCols2) * TS16, (t2 / sheetCols2) * TS16, TS16, TS16);
-                            _spriteBatch.Draw(_tsSheets[s2], new Rectangle(dx, dy, TSDst, TSDst), src2, Color.White);
-                        }
-                    }
                 }
             }
             return;
@@ -17050,6 +17038,25 @@ public class Game1 : Game
         }
     }
 
+    private void DrawTiledFloorFG()
+    {
+        if (!_roomTileOverlay.TryGetValue(_currentScreen, out var fg)) return;
+        var (roomCols, roomRows) = GetRoomTileSize(_currentScreen);
+        for (int r = 0; r < Math.Min(roomRows, fg.GetLength(0)); r++)
+        {
+            for (int c = 0; c < Math.Min(roomCols, fg.GetLength(1)); c++)
+            {
+                var (s, t) = fg[r, c];
+                if (s < 0 || t < 0 || _tsSheets[s] == null) continue;
+                int dx = c * TSDst;
+                int dy = r * TSDst;
+                int sheetCols = _tsSheets[s].Width / TS16;
+                var src = new Rectangle((t % sheetCols) * TS16, (t / sheetCols) * TS16, TS16, TS16);
+                _spriteBatch.Draw(_tsSheets[s], new Rectangle(dx, dy, TSDst, TSDst), src, Color.White);
+            }
+        }
+    }
+    
     private void DrawRoomBorders()
     {
         if (_gameMode != GameMode.Awakening) return;
@@ -17428,7 +17435,9 @@ public class Game1 : Game
         _mawSpawned = false;
         _unlockedForms.Add(Form.Bolt);
         _playerPos = new Vector2(_arena.Center.X, _arena.Center.Y);
-        _wandPickupPos = _playerPos + new Vector2(60, 0);
+        // Wand is inside cave — use cave center coords
+        int ax5 = _arena.Left, ay5 = _arena.Top;
+        _wandPickupPos = new Vector2(ax5 + 287, ay5 + 184 - 10); // caveCX, caveCY - 10
         _shieldPickupPos = _playerPos + new Vector2(-60, 0);
         _currentScreen = 5;
         _inTransition = false;
@@ -21343,6 +21352,9 @@ public class Game1 : Game
 
         if (playerVisible)
             DrawPlayer(_playerPos + new Vector2(0, -_jumpHeight), aimDir, playerColor, (float)gameTime.TotalGameTime.TotalSeconds, essColor, _jumpHeight);
+        
+        // FG overlay tiles drawn AFTER player — tree canopies etc. obscure the player
+        DrawTiledFloorFG();
 
         // Question mark when firing with empty loadout
         if (_questionMarkTimer > 0)
@@ -23919,7 +23931,8 @@ public class Game1 : Game
             // Player glow — gated behind Lambent Aura relic
             if (_hasLambentAura)
             {
-                int playerRadius = 250;
+                int playerRadius = 250 - (int)(_jumpHeight * 1.5f); // shrinks when jumping
+                if (playerRadius < 120) playerRadius = 120;
                 _spriteBatch.Draw(_lightGradient, new Rectangle(
                     (int)(_playerPos.X - playerRadius), (int)(_playerPos.Y - playerRadius),
                     playerRadius * 2, playerRadius * 2), Color.White * 0.9f);
