@@ -30,8 +30,8 @@ public class Game1 : Game
     private string[] _tsNames = { "dungeon", "exterior", "interior", "ship", "world" };
     private const int TS16 = 16; // source tile size for OpenRPG tilesets
     private const int TSDst = 48; // display size (16 × 3)
-    private const int TSRoomCols = 24; // 1160 / 48 ≈ 24
-    private const int TSRoomRows = 12; // 580 / 48 ≈ 12
+    private const int TSRoomCols = 25; // 1160 / 48 = 24.2, round up to 25
+    private const int TSRoomRows = 28; // max rows (Room 11 is 1300/48 ≈ 28)
     private int _trScale = 3;    // display scale for tile renderer (adjustable)
     private int _trSheetIdx = 0; // which sheet we're viewing
     private Vector2 _trCameraPos; // camera position in tile renderer mode
@@ -16954,9 +16954,10 @@ public class Game1 : Game
         // Check for painted room data first
         if (_roomTileData.TryGetValue(_currentScreen, out var painted))
         {
-            for (int r = 0; r < TSRoomRows; r++)
+            var (roomCols, roomRows) = GetRoomTileSize(_currentScreen);
+            for (int r = 0; r < roomRows; r++)
             {
-                for (int c = 0; c < TSRoomCols; c++)
+                for (int c = 0; c < roomCols; c++)
                 {
                     int dx = area.X + c * TSDst;
                     int dy = area.Y + r * TSDst;
@@ -24918,6 +24919,14 @@ public class Game1 : Game
     
     // ═══════════════ TILE RENDERER MODE ═══════════════
     
+    private (int cols, int rows) GetRoomTileSize(int room)
+    {
+        // Room 11 is 1160×1300, others are 1160×580
+        int arenaW = 1160;
+        int arenaH = room == 11 ? 1300 : 580;
+        return ((arenaW + TSDst - 1) / TSDst, (arenaH + TSDst - 1) / TSDst);
+    }
+    
     private (int sheet, int tile)[,] GetOrCreateRoomTiles(int room)
     {
         if (!_roomTileData.ContainsKey(room))
@@ -25129,11 +25138,31 @@ public class Game1 : Game
     
     private void UpdateTilePainter(KeyboardState kb, MouseState mouse, float dt)
     {
+        // WASD to pan camera
+        float speed = 400f * dt;
+        if (kb.IsKeyDown(Keys.LeftShift)) speed *= 3f;
+        if (kb.IsKeyDown(Keys.W)) _trCameraPos.Y -= speed;
+        if (kb.IsKeyDown(Keys.S)) _trCameraPos.Y += speed;
+        if (kb.IsKeyDown(Keys.A)) _trCameraPos.X -= speed;
+        if (kb.IsKeyDown(Keys.D)) _trCameraPos.X += speed;
+        
+        // Clamp camera
+        var (roomCols, roomRows) = GetRoomTileSize(_trPaintRoom);
+        int palW = 200;
+        int gridX = palW + 10;
+        int gridY = 60;
+        int totalGridW = roomCols * TSDst;
+        int totalGridH = roomRows * TSDst;
+        float maxCX = MathF.Max(0, totalGridW - (ScreenW - gridX) + 20);
+        float maxCY = MathF.Max(0, totalGridH - (ScreenH - gridY) + 20);
+        _trCameraPos.X = MathHelper.Clamp(_trCameraPos.X, 0, maxCX);
+        _trCameraPos.Y = MathHelper.Clamp(_trCameraPos.Y, 0, maxCY);
+        
         // Left/Right to switch rooms
         if (kb.IsKeyDown(Keys.Left) && !_prevKb.IsKeyDown(Keys.Left))
-            _trPaintRoom = Math.Max(1, _trPaintRoom - 1);
+        { _trPaintRoom = Math.Max(1, _trPaintRoom - 1); _trCameraPos = Vector2.Zero; }
         if (kb.IsKeyDown(Keys.Right) && !_prevKb.IsKeyDown(Keys.Right))
-            _trPaintRoom = Math.Min(11, _trPaintRoom + 1);
+        { _trPaintRoom = Math.Min(11, _trPaintRoom + 1); _trCameraPos = Vector2.Zero; }
         
         // Tab cycles palette sheet
         if (kb.IsKeyDown(Keys.Tab) && !_prevKb.IsKeyDown(Keys.Tab))
@@ -25155,8 +25184,8 @@ public class Game1 : Game
         if (kb.IsKeyDown(Keys.F) && !_prevKb.IsKeyDown(Keys.F) && _trSelectedTile >= 0)
         {
             var data = GetOrCreateRoomTiles(_trPaintRoom);
-            for (int r = 0; r < TSRoomRows; r++)
-                for (int c = 0; c < TSRoomCols; c++)
+            for (int r = 0; r < roomRows; r++)
+                for (int c = 0; c < roomCols; c++)
                     data[r, c] = (_trSelectedSheet, _trSelectedTile);
         }
         
@@ -25166,23 +25195,21 @@ public class Game1 : Game
             _trPaintMode = false;
         }
         
-        // Determine layout regions
-        int palW = 200; // palette width on left
-        int gridX = palW + 10;
-        int gridY = 60;
+        // Calculate grid position with camera offset
+        int camGX = gridX - (int)_trCameraPos.X;
+        int camGY = gridY - (int)_trCameraPos.Y;
         
         // Left-click on palette to select tile
         if (mouse.LeftButton == ButtonState.Pressed)
         {
             if (mouse.X < palW && mouse.Y > 50)
             {
-                // Clicking on palette — only register on press, not hold
                 if (_prevMouse.LeftButton == ButtonState.Released)
                 {
                     var sheet = _tsSheets != null && _trSheetIdx < _tsSheets.Length ? _tsSheets[_trSheetIdx] : null;
                     if (sheet != null)
                     {
-                        int palTileSize = 24; // small palette tiles
+                        int palTileSize = 24;
                         int palCols = (palW - 8) / (palTileSize + 1);
                         int mx = (mouse.X - 4) / (palTileSize + 1);
                         int my = (mouse.Y - 54 + _trPalScroll) / (palTileSize + 1);
@@ -25200,34 +25227,31 @@ public class Game1 : Game
                     }
                 }
             }
-            else if (mouse.X >= gridX && mouse.Y >= gridY)
+            else if (mouse.X >= palW)
             {
-                // Painting on room grid — allow continuous painting while held
-                int gc = (mouse.X - gridX) / TSDst;
-                int gr = (mouse.Y - gridY) / TSDst;
-                if (gc >= 0 && gc < TSRoomCols && gr >= 0 && gr < TSRoomRows)
+                // Painting on room grid with camera offset
+                int gc = (mouse.X - camGX) / TSDst;
+                int gr = (mouse.Y - camGY) / TSDst;
+                if (gc >= 0 && gc < roomCols && gr >= 0 && gr < roomRows && mouse.Y > 50)
                 {
                     var data = GetOrCreateRoomTiles(_trPaintRoom);
                     if (_trSelectedTile >= 0)
                         data[gr, gc] = (_trSelectedSheet, _trSelectedTile);
                     else
-                        data[gr, gc] = (-1, -1); // eraser
+                        data[gr, gc] = (-1, -1);
                 }
             }
         }
         
         // Right-click = erase
-        if (mouse.RightButton == ButtonState.Pressed)
+        if (mouse.RightButton == ButtonState.Pressed && mouse.X >= palW)
         {
-            if (mouse.X >= gridX && mouse.Y >= gridY)
+            int gc = (mouse.X - camGX) / TSDst;
+            int gr = (mouse.Y - camGY) / TSDst;
+            if (gc >= 0 && gc < roomCols && gr >= 0 && gr < roomRows)
             {
-                int gc = (mouse.X - gridX) / TSDst;
-                int gr = (mouse.Y - gridY) / TSDst;
-                if (gc >= 0 && gc < TSRoomCols && gr >= 0 && gr < TSRoomRows)
-                {
-                    var data = GetOrCreateRoomTiles(_trPaintRoom);
-                    data[gr, gc] = (-1, -1);
-                }
+                var data = GetOrCreateRoomTiles(_trPaintRoom);
+                data[gr, gc] = (-1, -1);
             }
         }
     }
@@ -25335,19 +25359,23 @@ public class Game1 : Game
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
         
         int palW = 200;
-        int gridX = palW + 10;
-        int gridY = 60;
+        int gridX = palW + 10 - (int)_trCameraPos.X;
+        int gridY = 60 - (int)_trCameraPos.Y;
+        var (roomCols, roomRows) = GetRoomTileSize(_trPaintRoom);
         
         // ── Room Grid ──
         var data = GetOrCreateRoomTiles(_trPaintRoom);
         var mouse = Mouse.GetState();
         
-        for (int r = 0; r < TSRoomRows; r++)
+        for (int r = 0; r < roomRows; r++)
         {
-            for (int c = 0; c < TSRoomCols; c++)
+            for (int c = 0; c < roomCols; c++)
             {
                 int dx = gridX + c * TSDst;
                 int dy = gridY + r * TSDst;
+                
+                // Cull off-screen
+                if (dx + TSDst < palW || dx > ScreenW || dy + TSDst < 50 || dy > ScreenH) continue;
                 
                 var (s, t) = data[r, c];
                 if (s >= 0 && t >= 0 && _tsSheets[s] != null)
@@ -25369,12 +25397,18 @@ public class Game1 : Game
             }
         }
         
+        // Room border outline
+        DrawRect(gridX - 1, gridY - 1, roomCols * TSDst + 2, 1, new Color(100, 100, 120));
+        DrawRect(gridX - 1, gridY + roomRows * TSDst, roomCols * TSDst + 2, 1, new Color(100, 100, 120));
+        DrawRect(gridX - 1, gridY, 1, roomRows * TSDst, new Color(100, 100, 120));
+        DrawRect(gridX + roomCols * TSDst, gridY, 1, roomRows * TSDst, new Color(100, 100, 120));
+        
         // Hover highlight on grid
-        if (mouse.X >= gridX && mouse.Y >= gridY)
+        if (mouse.X >= palW && mouse.Y > 50)
         {
             int gc = (mouse.X - gridX) / TSDst;
             int gr = (mouse.Y - gridY) / TSDst;
-            if (gc >= 0 && gc < TSRoomCols && gr >= 0 && gr < TSRoomRows)
+            if (gc >= 0 && gc < roomCols && gr >= 0 && gr < roomRows)
             {
                 int hx = gridX + gc * TSDst;
                 int hy = gridY + gr * TSDst;
@@ -25385,7 +25419,7 @@ public class Game1 : Game
             }
         }
         
-        // ── Palette (left side) ──
+        // ── Palette (left side, fixed) ──
         DrawRect(0, 50, palW, ScreenH - 50, new Color(25, 25, 30));
         
         var palSheet = _tsSheets != null && _trSheetIdx < _tsSheets.Length ? _tsSheets[_trSheetIdx] : null;
@@ -25398,7 +25432,6 @@ public class Game1 : Game
             int sheetRows2 = palSheet.Height / TS16;
             int totalTiles = sheetCols2 * sheetRows2;
             
-            // Clamp scroll
             int palRows = (totalTiles + palCols - 1) / palCols;
             int maxScroll = Math.Max(0, palRows * (palTileSize + palGap) - (ScreenH - 60));
             if (_trPalScroll < 0) _trPalScroll = 0;
@@ -25420,7 +25453,6 @@ public class Game1 : Game
                 DrawRect(px, py, palTileSize, palTileSize, new Color(35, 35, 40));
                 _spriteBatch.Draw(palSheet, new Rectangle(px, py, palTileSize, palTileSize), src, Color.White);
                 
-                // Highlight selected
                 if (i == _trSelectedTile && _trSelectedSheet == _trSheetIdx)
                 {
                     DrawRect(px - 1, py - 1, palTileSize + 2, 1, Color.Lime);
@@ -25431,13 +25463,12 @@ public class Game1 : Game
             }
         }
         
-        // ── Header ──
+        // ── Header (fixed) ──
         DrawRect(0, 0, ScreenW, 50, new Color(15, 15, 20, 230));
-        string roomName = (_trPaintRoom <= 11 && _trPaintRoom >= 0) ? $"Room {_trPaintRoom}" : $"Room {_trPaintRoom}";
         string selStr = _trSelectedTile >= 0 ? $"{_tsNames[_trSelectedSheet]}#{_trSelectedTile}" : "ERASER";
-        string header = $"PAINT — {roomName}  |  Tile: {selStr}  |  Palette: {_tsNames[_trSheetIdx]}";
+        string header = $"PAINT — Room {_trPaintRoom} ({roomCols}×{roomRows})  |  Tile: {selStr}  |  Palette: {_tsNames[_trSheetIdx]}";
         DrawTextOutlined(10, 6, header, new Color(200, 170, 100), Color.Black, 0.9f);
-        string controls = "L/R:room  TAB:palette sheet  Click:paint  RClick:erase  X:eraser  F:fill  Ctrl+S:save  P:browse  ESC:back";
+        string controls = "WASD:pan  L/R:room  TAB:sheet  Click:paint  RClick:erase  X:eraser  F:fill  Ctrl+S:save  P:browse  ESC:back";
         DrawTextOutlined(10, 28, controls, new Color(100, 100, 120), Color.Black, 0.65f);
         
         _spriteBatch.End();
