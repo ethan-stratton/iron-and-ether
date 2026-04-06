@@ -632,6 +632,9 @@ public class Game1 : Game
     private enum DoorState { Locked, Opening, Open }
     private enum DoorKeyType { None, Lance, Wave, Flame, ShieldDash, Grimoire }
     private enum WallType { None, Tree, Stone, Water, Lava, Cliff, Void }
+    
+    // Floor tile styles — indexes into tile sheet regions
+    private enum FloorStyle { DarkStone, BrownStone, Cave, Ice, Lava, Grass, Void }
     private struct Door
     {
         public int FromScreen, ToScreen;
@@ -16869,6 +16872,117 @@ public class Game1 : Game
         };
     }
 
+    private FloorStyle GetRoomFloor(int room)
+    {
+        return room switch
+        {
+            1 => FloorStyle.DarkStone,   // Gauntlet
+            2 => FloorStyle.BrownStone,  // Armory
+            3 => FloorStyle.Grass,       // Proving Grounds
+            4 => FloorStyle.BrownStone,  // Knight's Hall
+            5 => FloorStyle.Cave,        // Awakening
+            6 => FloorStyle.Cave,        // Wellspring
+            7 => FloorStyle.Ice,         // Shrine
+            8 => FloorStyle.Lava,        // Lava Sanctum
+            9 => FloorStyle.Void,        // Boss
+            11 => FloorStyle.DarkStone,  // The Depths
+            _ => FloorStyle.DarkStone
+        };
+    }
+
+    // Get floor tile source rects for a style (returns 2-4 tile variants for visual variety)
+    private (Texture2D sheet, Rectangle[] tiles) GetFloorTiles(FloorStyle style)
+    {
+        // Dungeon sheet floor tiles (identified from visual inspection)
+        // Each entry is a source rect in the 16×16 grid
+        return style switch
+        {
+            FloorStyle.DarkStone => (_tsDungeon, new[] {
+                new Rectangle(6 * 16, 8 * 16, 16, 16),  // dark stone 1
+                new Rectangle(7 * 16, 8 * 16, 16, 16),  // dark stone 2
+                new Rectangle(6 * 16, 9 * 16, 16, 16),  // dark stone 3
+                new Rectangle(7 * 16, 9 * 16, 16, 16),  // dark stone 4
+            }),
+            FloorStyle.BrownStone => (_tsDungeon, new[] {
+                new Rectangle(6 * 16, 0 * 16, 16, 16),  // brown stone 1
+                new Rectangle(7 * 16, 0 * 16, 16, 16),  // brown stone 2
+                new Rectangle(6 * 16, 1 * 16, 16, 16),  // brown stone 3
+                new Rectangle(7 * 16, 1 * 16, 16, 16),  // brown stone 4
+            }),
+            FloorStyle.Cave => (_tsDungeon, new[] {
+                new Rectangle(6 * 16, 4 * 16, 16, 16),  // cave 1
+                new Rectangle(7 * 16, 4 * 16, 16, 16),  // cave 2
+                new Rectangle(6 * 16, 5 * 16, 16, 16),  // cave 3
+                new Rectangle(7 * 16, 5 * 16, 16, 16),  // cave 4
+            }),
+            FloorStyle.Ice => (_tsDungeon, new[] {
+                new Rectangle(6 * 16, 6 * 16, 16, 16),  // ice 1
+                new Rectangle(7 * 16, 6 * 16, 16, 16),  // ice 2
+                new Rectangle(6 * 16, 7 * 16, 16, 16),  // ice 3
+                new Rectangle(7 * 16, 7 * 16, 16, 16),  // ice 4
+            }),
+            FloorStyle.Lava => (_tsDungeon, new[] {
+                new Rectangle(0 * 16, 8 * 16, 16, 16),  // lava stone 1
+                new Rectangle(1 * 16, 8 * 16, 16, 16),  // lava stone 2
+                new Rectangle(0 * 16, 9 * 16, 16, 16),  // lava stone 3
+                new Rectangle(1 * 16, 9 * 16, 16, 16),  // lava stone 4
+            }),
+            FloorStyle.Grass => (_tsWorld, new[] {
+                new Rectangle(6 * 16, 0 * 16, 16, 16),  // grass 1
+                new Rectangle(7 * 16, 0 * 16, 16, 16),  // grass 2
+                new Rectangle(6 * 16, 1 * 16, 16, 16),  // grass 3
+                new Rectangle(7 * 16, 1 * 16, 16, 16),  // grass 4
+            }),
+            _ => (null, null) // Void — no floor tiles, keep black
+        };
+    }
+
+    private void DrawTiledFloor(Rectangle area)
+    {
+        var style = GetRoomFloor(_currentScreen);
+        var (sheet, tiles) = GetFloorTiles(style);
+        
+        if (sheet == null || tiles == null)
+        {
+            // Void / fallback — dark rect
+            DrawRect(area.X, area.Y, area.Width, area.Height, new Color(15, 15, 20));
+            return;
+        }
+        
+        int dst = TS16 * 3; // 48px display size (3× scale)
+        int cols = (area.Width + dst - 1) / dst;
+        int rows = (area.Height + dst - 1) / dst;
+        
+        for (int r = 0; r < rows; r++)
+        {
+            for (int c = 0; c < cols; c++)
+            {
+                int dx = area.X + c * dst;
+                int dy = area.Y + r * dst;
+                
+                // Pick tile variant using deterministic hash (stable across frames)
+                int hash = ((_currentScreen * 7919) + (r * 31) + c) & 0x7FFFFFFF;
+                int tileIdx = hash % tiles.Length;
+                
+                // Clamp to arena bounds
+                int drawW = Math.Min(dst, area.Right - dx);
+                int drawH = Math.Min(dst, area.Bottom - dy);
+                if (drawW <= 0 || drawH <= 0) continue;
+                
+                // Source rect (may need partial for edge tiles)
+                var src = tiles[tileIdx];
+                if (drawW < dst || drawH < dst)
+                {
+                    float srcFracW = (float)drawW / dst;
+                    float srcFracH = (float)drawH / dst;
+                    src = new Rectangle(src.X, src.Y, (int)(16 * srcFracW), (int)(16 * srcFracH));
+                }
+                
+                _spriteBatch.Draw(sheet, new Rectangle(dx, dy, drawW, drawH), src, Color.White);
+            }
+        }
+    }
+
     private void DrawRoomBorders()
     {
         if (_gameMode != GameMode.Awakening) return;
@@ -21037,7 +21151,11 @@ public class Game1 : Game
             DrawRect(_arena.Left - pad, _arena.Top - pad, _arena.Width + pad * 2, _arena.Height + pad * 2, new Color(10, 10, 15));
         }
         DrawRect(_arena.Left - 2, _arena.Top - 2, _arena.Width + 4, _arena.Height + 4, new Color(40, 40, 50));
-        DrawRect(_arena.Left, _arena.Top, _arena.Width, _arena.Height, new Color(15, 15, 20));
+        // Tiled floor (replaces flat color if tilesets loaded)
+        if (_tsDungeon != null)
+            DrawTiledFloor(_arena);
+        else
+            DrawRect(_arena.Left, _arena.Top, _arena.Width, _arena.Height, new Color(15, 15, 20));
         
         // Room 11: stone floor tiles to show the extended area
         if (_currentScreen == 11)
