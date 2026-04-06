@@ -25407,10 +25407,12 @@ public class Game1 : Game
         var bgData = GetOrCreateRoomTiles(_trPaintRoom);
         var fgData = GetOrCreateRoomOverlay(_trPaintRoom);
         var mouse = Mouse.GetState();
+        int maxR = Math.Min(roomRows, Math.Min(bgData.GetLength(0), fgData.GetLength(0)));
+        int maxC = Math.Min(roomCols, Math.Min(bgData.GetLength(1), fgData.GetLength(1)));
         
-        for (int r = 0; r < roomRows; r++)
+        for (int r = 0; r < maxR; r++)
         {
-            for (int c = 0; c < roomCols; c++)
+            for (int c = 0; c < maxC; c++)
             {
                 int dx = gridX + c * TSDst;
                 int dy = gridY + r * TSDst;
