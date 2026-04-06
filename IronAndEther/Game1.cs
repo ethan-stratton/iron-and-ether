@@ -787,6 +787,21 @@ public class Game1 : Game
     private Vector2 _dashDir;
     private bool _isDashing;
 
+    // Sword
+    private bool _hasSword = false;
+    private float _swordTimer;         // counts down during swing
+    private float _swordCooldown;      // cooldown between swings
+    private const float SwordSwingTime = 0.25f;
+    private const float SwordCooldownTime = 0.4f;
+    private const float SwordRange = 55f;
+    private const float SwordArc = MathF.PI / 2f; // 90° arc
+    private const float SwordDamage = 6f;
+    private const float SwordKnockback = 120f;
+    private const float SwordStagger = 15f;
+    private const float SwordLunge = 12f;
+    private Vector2 _swordDir;         // direction of current swing
+    private HashSet<int> _swordHitEnemies = new(); // prevent multi-hit per swing
+
     // Relics
     private bool _hasCaliburn = false;  // Pierce one enemy
     private float _menuFlashTimer = 0f;
@@ -2435,6 +2450,55 @@ public class Game1 : Game
                 PlaySfx(_sfxDash);
                 _dashTimer = DashDuration;
                 _dashCooldown = DashCooldownTime;
+            }
+        }
+
+        // Sword swing — Shift key
+        _swordCooldown -= dt;
+        if (_swordTimer > 0) _swordTimer -= dt;
+        if (_hasSword && kb.IsKeyDown(Keys.LeftShift) && !_prevKb.IsKeyDown(Keys.LeftShift) 
+            && _swordCooldown <= 0 && _swordTimer <= 0 && !_isDashing && !_finisherActive)
+        {
+            _mouseWorld = new Vector2(mouse.X + _cameraOffset.X, mouse.Y + _cameraOffset.Y);
+            _swordDir = Vector2.Normalize(_mouseWorld - _playerPos);
+            if (float.IsNaN(_swordDir.X)) _swordDir = new Vector2(1, 0);
+            _swordTimer = SwordSwingTime;
+            _swordCooldown = SwordCooldownTime;
+            _swordHitEnemies.Clear();
+            // Small lunge toward cursor
+            _playerPos += _swordDir * SwordLunge;
+            PlaySfx(_sfxHit);
+        }
+        // Sword hit detection during swing
+        if (_swordTimer > 0)
+        {
+            float swingAngle = MathF.Atan2(_swordDir.Y, _swordDir.X);
+            for (int i = 0; i < _enemies.Count; i++)
+            {
+                if (_swordHitEnemies.Contains(i)) continue;
+                var e = _enemies[i];
+                if (!e.Alive || e.Spawning) continue;
+                float dist = Vector2.Distance(_playerPos, e.Position);
+                if (dist > SwordRange + e.Size) continue;
+                // Check if enemy is within the arc
+                float angleToEnemy = MathF.Atan2(e.Position.Y - _playerPos.Y, e.Position.X - _playerPos.X);
+                float angleDiff = MathF.Abs(MathHelper.WrapAngle(angleToEnemy - swingAngle));
+                if (angleDiff > SwordArc / 2f) continue;
+                // Hit!
+                _swordHitEnemies.Add(i);
+                e.Hp -= SwordDamage;
+                e.HitFlash = 0.15f;
+                e.HitCooldown = 0.1f;
+                // Stagger
+                if (e.Stagger < e.MaxStagger)
+                    e.Stagger += SwordStagger;
+                // Knockback
+                if (dist > 1f)
+                {
+                    Vector2 kb2 = Vector2.Normalize(e.Position - _playerPos) * SwordKnockback;
+                    e.Velocity += kb2;
+                }
+                _enemies[i] = e;
             }
         }
 
@@ -10718,6 +10782,7 @@ public class Game1 : Game
                         InitAwakeningDoors();
                         _hasLambentAura = true; _ownsLambentAura = true; // player glows from the start
                         _hasEtherRegen = true; _hasEtherRegenRelic = true; _ownsEtherRegen = true; // passive EP regen
+                        _hasSword = true;
                         _state = GameState.Playing;
                         break;
                     case 1:
@@ -10730,6 +10795,7 @@ public class Game1 : Game
                         ResetGame();
                         _hasWand = true;
                         _hasShield = true;
+                        _hasSword = true;
                         _hasCaliburn = true; _hasNimueTear = true; _hasWandOfMerlin = true; _hasTomeOfBinding = true; _ownsTomeOfBinding = true;
                         _hasHasteBand = true; _hasPhylactery = true; _hasGrimoire = true;
                         _hasLambentAura = true; _ownsLambentAura = true;
@@ -25037,6 +25103,45 @@ public class Game1 : Game
                 DrawRect(tx - 2, ty - 2, 5, 5, heatColor * (glowAlpha * 0.8f));
                 DrawRect(tx - 1, ty - 1, 3, 3, new Color(255, 220, 160) * (glowAlpha * 0.5f));
             }
+        }
+        
+        // Sword swing arc
+        if (_hasSword && _swordTimer > 0)
+        {
+            float swingProgress = 1f - (_swordTimer / SwordSwingTime); // 0→1
+            float baseAngle = MathF.Atan2(_swordDir.Y, _swordDir.X);
+            // Sweep from -45° to +45° over the swing duration
+            float sweepAngle = baseAngle + MathHelper.Lerp(-SwordArc / 2f, SwordArc / 2f, swingProgress);
+            
+            Color bladeColor = new Color(200, 210, 220);
+            Color trailColor = new Color(180, 190, 200) * (0.6f - swingProgress * 0.4f);
+            
+            // Draw blade (line of pixels from player outward)
+            for (int i = 8; i < (int)SwordRange; i += 2)
+            {
+                float px2 = pos.X + MathF.Cos(sweepAngle) * i;
+                float py2 = pos.Y + MathF.Sin(sweepAngle) * i;
+                float alpha = 1f - (float)i / SwordRange;
+                DrawRect((int)px2, (int)py2, 2, 2, bladeColor * alpha);
+            }
+            
+            // Draw trailing arc (3 trailing lines for sweep effect)
+            for (int t = 1; t <= 3; t++)
+            {
+                float trailAngle = sweepAngle - (SwordArc / 8f) * t;
+                float trailAlpha = (1f - t / 4f) * 0.4f;
+                for (int i = 12; i < (int)SwordRange - 5; i += 3)
+                {
+                    float px2 = pos.X + MathF.Cos(trailAngle) * i;
+                    float py2 = pos.Y + MathF.Sin(trailAngle) * i;
+                    DrawRect((int)px2, (int)py2, 1, 1, trailColor * trailAlpha);
+                }
+            }
+            
+            // Blade tip spark
+            float tipX = pos.X + MathF.Cos(sweepAngle) * (SwordRange - 4);
+            float tipY = pos.Y + MathF.Sin(sweepAngle) * (SwordRange - 4);
+            DrawRect((int)tipX - 1, (int)tipY - 1, 3, 3, Color.White * (0.8f - swingProgress * 0.6f));
         }
     }
 
