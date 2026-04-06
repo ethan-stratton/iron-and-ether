@@ -186,8 +186,8 @@ public class Enemy
         if (StaggerTimer > 0) return; // stunned
         if (Pacified)
         {
-            // Gentle wander — slow random movement, avoid player & walls
-            float wanderSpeed = 12f;
+            // Gentle wander — slow languid movement
+            float wanderSpeed = 18f;
             AiStateTimer -= dt;
             if (AiStateTimer <= 0)
             {
@@ -195,23 +195,17 @@ public class Enemy
                 AiPhase++;
                 int hash = Id * 7919 + AiPhase * 104729;
                 float angle = (hash & 0xFFFF) / 65535f * MathF.PI * 2f;
-                AiStateTimer = 1.5f + ((hash >> 16) & 0xFF) / 255f * 1.5f;
+                AiStateTimer = 2f + ((hash >> 16) & 0xFF) / 255f * 2f;
                 Velocity = new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * wanderSpeed;
             }
             
-            // Drift away from player if close
-            Vector2 toPl = playerPos - Position;
-            float pDist = toPl.Length();
-            if (pDist < 100f && pDist > 1f)
-            {
-                Vector2 away = -Vector2.Normalize(toPl) * wanderSpeed * 1.5f;
-                Velocity = Vector2.Lerp(Velocity, away, 4f * dt);
-            }
+            // Gradual deceleration between direction changes (languid drift)
+            Velocity *= (1f - 0.3f * dt);
             
             // Apply movement
             Position += Velocity * dt;
             
-            // Wall avoidance — clamp to arena
+            // Wall avoidance — clamp to arena and bounce
             if (Position.X < arena.Left + Size) { Position = new Vector2(arena.Left + Size, Position.Y); Velocity = new Vector2(MathF.Abs(Velocity.X), Velocity.Y); }
             if (Position.X > arena.Right - Size) { Position = new Vector2(arena.Right - Size, Position.Y); Velocity = new Vector2(-MathF.Abs(Velocity.X), Velocity.Y); }
             if (Position.Y < arena.Top + Size) { Position = new Vector2(Position.X, arena.Top + Size); Velocity = new Vector2(Velocity.X, MathF.Abs(Velocity.Y)); }
