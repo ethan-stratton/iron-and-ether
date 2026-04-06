@@ -3,10 +3,13 @@ IronAndEther/Content/bin/
 IronAndEther/Content/obj/
 IronAndEther/bin/
 
-# Audio assets (too large for git)
+# Audio assets (WAVs too large for git — oggs are fine)
 *.wav
 *.mp3
-*.ogg
+
+# Music source packs (too large, only Content/Music/*.ogg needed)
+**/Boss Battle Music Pack Vol*
+**/Fantasy RPG Music Vol*
 
 # Build outputs
 **/bin/
