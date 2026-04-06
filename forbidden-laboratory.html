@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚗️ The Forbidden Laboratory — Iron & Ether</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; color: #c8c8d0; font-family: 'Segoe UI', system-ui, sans-serif; padding: 20px; }
+  h1 { color: #d4af37; font-size: 28px; margin-bottom: 4px; }
+  h2 { color: #d4af37; font-size: 20px; margin: 30px 0 12px; border-bottom: 1px solid #2a2a3a; padding-bottom: 6px; }
+  h3 { color: #8888cc; font-size: 16px; margin: 20px 0 8px; }
+  .subtitle { color: #666; font-size: 14px; margin-bottom: 20px; }
+  .stats { display: flex; gap: 20px; margin: 16px 0; flex-wrap: wrap; }
+  .stat { background: #14141f; border: 1px solid #2a2a3a; border-radius: 8px; padding: 12px 18px; }
+  .stat .num { font-size: 28px; color: #d4af37; font-weight: bold; }
+  .stat .label { font-size: 12px; color: #666; }
+  .filters { margin: 16px 0; display: flex; gap: 8px; flex-wrap: wrap; }
+  .filters button { background: #1a1a2a; color: #888; border: 1px solid #2a2a3a; border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 12px; }
+  .filters button.active { background: #2a2a4a; color: #d4af37; border-color: #d4af37; }
+  .filters button:hover { background: #2a2a4a; color: #ccc; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 20px; font-size: 13px; }
+  th { background: #14141f; color: #8888cc; text-align: left; padding: 8px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; position: sticky; top: 0; }
+  td { padding: 7px 10px; border-bottom: 1px solid #1a1a2a; vertical-align: top; }
+  tr:hover td { background: #12121d; }
+  .implemented { color: #4a4; }
+  .not-implemented { color: #a44; }
+  .tag { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; margin: 1px; }
+  .tag-form { background: #2a1a1a; color: #e88; }
+  .tag-behavior { background: #1a1a2a; color: #88e; }
+  .tag-essence { background: #1a2a1a; color: #8e8; }
+  .tag-quest { background: #2a2a1a; color: #ee8; }
+  .tag-impl { background: #1a2a1a; color: #4a4; }
+  .tag-notimpl { background: #2a1a1a; color: #a44; }
+  .quest-cell { max-width: 350px; }
+  .npc-table td:first-child { font-weight: bold; color: #d4af37; }
+  .section-nav { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
+  .section-nav a { color: #8888cc; text-decoration: none; font-size: 13px; padding: 4px 10px; border: 1px solid #2a2a3a; border-radius: 4px; }
+  .section-nav a:hover { background: #1a1a2a; color: #d4af37; }
+  input[type="search"] { background: #14141f; border: 1px solid #2a2a3a; color: #c8c8d0; padding: 6px 12px; border-radius: 4px; width: 300px; font-size: 13px; margin: 8px 0; }
+  input[type="search"]::placeholder { color: #444; }
+  .combo-type { font-size: 11px; color: #666; }
+</style>
+</head>
+<body>
+
+<h1>⚗️ The Forbidden Laboratory</h1>
+<p class="subtitle">Iron & Ether — Complete Combo Reference & Quest Guide</p>
+
+<div class="section-nav">
+  <a href="#stats">Stats</a>
+  <a href="#triple">Spell Fusions (Triple)</a>
+  <a href="#dual">Dual Combos</a>
+  <a href="#quests">Quest Unlock Table</a>
+  <a href="#npcs">NPC Roster</a>
+</div>
+
+<div id="stats" class="stats">
+  <div class="stat"><div class="num">39</div><div class="label">Spell Fusions (Triple)</div></div>
+  <div class="stat"><div class="num">68</div><div class="label">Dual Combos</div></div>
+  <div class="stat"><div class="num">34</div><div class="label">Implemented</div></div>
+  <div class="stat"><div class="num">34</div><div class="label">Quest-Linked Fusions</div></div>
+  <div class="stat"><div class="num">25+</div><div class="label">Named NPCs</div></div>
+</div>
+
+<h2 id="triple">Spell Fusions (Triple Combos)</h2>
+<p style="color:#666;font-size:12px;margin-bottom:8px;">All three slots filled. Named, curated attacks with unique visuals.</p>
+
+<input type="search" id="fusionSearch" placeholder="Search fusions..." oninput="filterTable('fusionTable', this.value)">
+
+<div class="filters" id="implFilter">
+  <button class="active" onclick="filterImpl('all', this)">All</button>
+  <button onclick="filterImpl('yes', this)">✅ Implemented</button>
+  <button onclick="filterImpl('no', this)">❌ Not Yet</button>
+</div>
+
+<table id="fusionTable">
+<thead>
+<tr><th>Fusion Name</th><th>Form</th><th>Behavior</th><th>Essence</th><th>Status</th><th>Quest Giver</th><th>Effect</th></tr>
+</thead>
+<tbody>
+<!-- IN CODE + IN GDD (implemented) -->
+<tr data-impl="yes"><td style="color:#d4af37">Dragon's Teeth</td><td><span class="tag tag-form">Bolt</span></td><td><span class="tag tag-behavior">Shatter</span></td><td><span class="tag tag-essence">Bone</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>Sir Brunor</td><td>Bone bolt shatters into skeleton soldiers that fight briefly</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Yggdrasil's Root</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Bloom</span></td><td><span class="tag tag-essence">Sap</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>Dame Ragnelle</td><td>Seed grows into a massive tree that attacks with vines and heals you</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Indra's Arrow</td><td><span class="tag tag-form">Chain</span></td><td><span class="tag tag-behavior">Bounce</span></td><td><span class="tag tag-essence">Pulse</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>Sir Dinadan</td><td>Lightning bounces off every surface AND chains between all enemies</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Event Horizon</td><td><span class="tag tag-form">Orbit</span></td><td><span class="tag tag-behavior">Stasis</span></td><td><span class="tag tag-essence">Hollow</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>Lady of the Lake</td><td>Black hole orbits you, freezing and crushing everything it touches</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Dragonbreath</td><td><span class="tag tag-form">Shotgun</span></td><td><span class="tag tag-behavior">Linger</span></td><td><span class="tag tag-essence">Cinder</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>Sir Yvain</td><td>Cone of fire, leaves burning ground everywhere</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Rift Tide</td><td><span class="tag tag-form">Wave</span></td><td><span class="tag tag-behavior">Linger</span></td><td><span class="tag tag-essence">Hollow</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>Sir Bors</td><td>Sine wave leaves void tears that suck enemies in</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Death's Scythe</td><td><span class="tag tag-form">Saw</span></td><td><span class="tag tag-behavior">Bounce</span></td><td><span class="tag tag-essence">Bone</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>King Pellinore (ghost)</td><td>Spinning bone blade bounces infinitely off walls and enemies</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Gáe Bolg</td><td><span class="tag tag-form">Bolt</span></td><td><span class="tag tag-behavior">Stasis</span></td><td><span class="tag tag-essence">Pulse</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>Sir Feirefiz</td><td>Lightning bolt freezes time on impact, then detonates</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Gebel's Swarm</td><td><span class="tag tag-form">Shotgun</span></td><td><span class="tag tag-behavior">Possess</span></td><td><span class="tag tag-essence">Dark</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>Sir Dagonet</td><td>Shotgun fires swarms of bats that possess enemies on kill</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Surtr's Crown</td><td><span class="tag tag-form">Orbit</span></td><td><span class="tag tag-behavior">Bloom</span></td><td><span class="tag tag-essence">Cinder</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>Sir Brunor</td><td>Fire ring orbits you, growing until it fills the screen</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Grave Call</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Shatter</span></td><td><span class="tag tag-essence">Bone</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>Sir Dinadan</td><td>Bone mine erupts into a wave of skeleton warriors</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Tiamat's Garden</td><td><span class="tag tag-form">Wave</span></td><td><span class="tag tag-behavior">Bloom</span></td><td><span class="tag tag-essence">Sap</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>Henwen the Sow</td><td>Sine wave grows into a wall of thorns and vines</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Chronos' Chain</td><td><span class="tag tag-form">Chain</span></td><td><span class="tag tag-behavior">Stasis</span></td><td><span class="tag tag-essence">Hollow</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>The Green Knight</td><td>Chains between enemies freezing each one in time</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Pillars of Muspelheim</td><td><span class="tag tag-form">Bolt</span></td><td><span class="tag tag-behavior">Linger</span></td><td><span class="tag tag-essence">Cinder</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>Sir Gareth</td><td>Fire bolt leaves pillars of flame along its path</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Morrigan's Court</td><td><span class="tag tag-form">Orbit</span></td><td><span class="tag tag-behavior">Possess</span></td><td><span class="tag tag-essence">Dark</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>Sir Dagonet</td><td>Dark spirits orbit you, possessing any enemy they touch</td></tr>
+<!-- IN CODE, NOT in original GDD quest table (implemented, no quest yet) -->
+<tr data-impl="yes"><td style="color:#d4af37">Fimbulwinter</td><td><span class="tag tag-form">Nova</span></td><td><span class="tag tag-behavior">Stasis</span></td><td><span class="tag tag-essence">Hollow</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Point-blank omnidirectional freeze burst</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Samael's Embrace</td><td><span class="tag tag-form">Nova</span></td><td><span class="tag tag-behavior">Possess</span></td><td><span class="tag tag-essence">Dark</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Point-blank dark possession burst</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Vesuvius</td><td><span class="tag tag-form">Nova</span></td><td><span class="tag tag-behavior">Linger</span></td><td><span class="tag tag-essence">Cinder</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Point-blank eruption leaving persistent fire</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Surya's Wrath</td><td><span class="tag tag-form">Lance</span></td><td><span class="tag tag-behavior">Linger</span></td><td><span class="tag tag-essence">Cinder</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Fire beam leaving scorched ground</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Longinus</td><td><span class="tag tag-form">Lance</span></td><td><span class="tag tag-behavior">Stasis</span></td><td><span class="tag tag-essence">Hollow</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Icy piercing beam that freezes</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Gungnir</td><td><span class="tag tag-form">Lance</span></td><td><span class="tag tag-behavior">Bloom</span></td><td><span class="tag tag-essence">Dark</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Growing dark spear beam</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Hiten Mitsurugi</td><td><span class="tag tag-form">Lance</span></td><td><span class="tag tag-behavior">Shatter</span></td><td><span class="tag tag-essence">Silk</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Battojutsu slash — 5× damage, 2.5s cooldown, hitstop</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Shango's Shale</td><td><span class="tag tag-form">Volley</span></td><td><span class="tag tag-behavior">Bounce</span></td><td><span class="tag tag-essence">Pulse</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Three-round lightning burst that bounces</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Katyusha</td><td><span class="tag tag-form">Volley</span></td><td><span class="tag tag-behavior">Shatter</span></td><td><span class="tag tag-essence">Cinder</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Three-round fire burst that shatters into cluster munitions</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Gorgon's Grasp</td><td><span class="tag tag-form">Volley</span></td><td><span class="tag tag-behavior">Stasis</span></td><td><span class="tag tag-essence">Sap</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Autonomous snakes behind player, bite+spit at enemies</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Portal to Hell</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Linger</span></td><td><span class="tag tag-essence">Cinder</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Fire seed opens a persistent fire portal</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Portal to Heaven</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Linger</span></td><td><span class="tag tag-essence">Hollow</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Void seed opens a persistent holy portal</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Nikola's Coil</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Stasis</span></td><td><span class="tag tag-essence">Pulse</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Lightning mine with persistent shock</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Bouncing Betty</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Bounce</span></td><td><span class="tag tag-essence">Bone</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Bone mine that bounces shrapnel off walls</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Medusa's Garden</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Stasis</span></td><td><span class="tag tag-essence">Bone</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Bone mine that petrifies in area</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Saibaman</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Possess</span></td><td><span class="tag tag-essence">Dark</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Dark seed that possesses on detonation</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Senbonzakura</td><td><span class="tag tag-form">Wave</span></td><td><span class="tag tag-behavior">Bloom</span></td><td><span class="tag tag-essence">Silk</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>7-10 piercing petal blades, death by a thousand cuts</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Shadow Stitch</td><td><span class="tag tag-form">Bolt</span></td><td><span class="tag tag-behavior">Possess</span></td><td><span class="tag tag-essence">Dark</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Channeled shadow hand, chain-possess enemies</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Sacred Fist</td><td><span class="tag tag-form">Nova</span></td><td><span class="tag tag-behavior">Shatter</span></td><td><span class="tag tag-essence">Bone</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Massive bone fist punch, 4× damage, shrapnel burst</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Earthquake</td><td><span class="tag tag-form">Nova</span></td><td><span class="tag tag-behavior">Linger</span></td><td><span class="tag tag-essence">Bone</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Ground-pound that leaves lingering bone spikes</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Unicorn Diana</td><td><span class="tag tag-form">Nova</span></td><td><span class="tag tag-behavior">Bloom</span></td><td><span class="tag tag-essence">Pulse</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Electrical burst that blooms outward</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Serpent Mercury</td><td><span class="tag tag-form">Chain</span></td><td><span class="tag tag-behavior">Linger</span></td><td><span class="tag tag-essence">Sap</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Lightning vines chain between enemies with linger zones</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Thunderbird Mars</td><td><span class="tag tag-form">Lance</span></td><td><span class="tag tag-behavior">Shatter</span></td><td><span class="tag tag-essence">Pulse</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Lightning beam that shatters into arcing bolts</td></tr>
+<tr data-impl="yes"><td style="color:#d4af37">Dark Gate</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Linger</span></td><td><span class="tag tag-essence">Dark</span></td><td><span class="tag tag-impl">✅ Implemented</span></td><td>—</td><td>Dark seed opens a shadow portal</td></tr>
+<!-- NEW — in GDD quest table but NOT in code yet -->
+<tr data-impl="no"><td style="color:#a88">Ragnarök</td><td><span class="tag tag-form">Nova</span></td><td><span class="tag tag-behavior">Shatter</span></td><td><span class="tag tag-essence">Cinder</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>Sir Brunor</td><td>Point-blank explosion shatters into fireballs in all directions, each leaving linger fire</td></tr>
+<tr data-impl="no"><td style="color:#a88">Rhongomyniad</td><td><span class="tag tag-form">Lance</span></td><td><span class="tag tag-behavior">Stasis</span></td><td><span class="tag tag-essence">Pulse</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>Sir Kay</td><td>Arthur's spear — piercing beam freezes time along path, then detonates the line</td></tr>
+<tr data-impl="no"><td style="color:#a88">Morrígan's Flock</td><td><span class="tag tag-form">Volley</span></td><td><span class="tag tag-behavior">Bloom</span></td><td><span class="tag tag-essence">Dark</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>Sir Lamorak (ghost)</td><td>Three-round burst of shadow ravens that grow in flight, possessing on hit</td></tr>
+<tr data-impl="no"><td style="color:#a88">Mistletoe's Chains</td><td><span class="tag tag-form">Chain</span></td><td><span class="tag tag-behavior">Linger</span></td><td><span class="tag tag-essence">Sap</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>Sir Pelleas</td><td>Lightning vines chain between enemies, leaving heal-on-hit zones</td></tr>
+<tr data-impl="no"><td style="color:#a88">Arondight's Shadow</td><td><span class="tag tag-form">Saw</span></td><td><span class="tag tag-behavior">Linger</span></td><td><span class="tag tag-essence">Dark</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>Sir Tristan</td><td>Buzzsaw leaves dark trail that fears enemies into each other</td></tr>
+<tr data-impl="no"><td style="color:#a88">Niflheim Blast</td><td><span class="tag tag-form">Shotgun</span></td><td><span class="tag tag-behavior">Stasis</span></td><td><span class="tag tag-essence">Bone</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>Sir Dagonet</td><td>Bone shotgun freezes on hit, frozen enemies shatter into more bone</td></tr>
+<tr data-impl="no"><td style="color:#a88">Green Man's Embrace</td><td><span class="tag tag-form">Nova</span></td><td><span class="tag tag-behavior">Possess</span></td><td><span class="tag tag-essence">Sap</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>Brother Caradoc</td><td>Vine burst possesses enemies, turning them into Sap allies that heal you</td></tr>
+<tr data-impl="no"><td style="color:#a88">Tesla's Volley</td><td><span class="tag tag-form">Volley</span></td><td><span class="tag tag-behavior">Bounce</span></td><td><span class="tag tag-essence">Pulse</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>Sir Safir</td><td>Three-shot lightning burst that bounces, adding bolts per bounce</td></tr>
+<tr data-impl="no"><td style="color:#a88">Excalibur's Light</td><td><span class="tag tag-form">Lance</span></td><td><span class="tag tag-behavior">Bloom</span></td><td><span class="tag tag-essence">Sap</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>Parzival (finale)</td><td>Golden-green beam grows wider, heals allies while damaging enemies. Post-game only.</td></tr>
+<tr data-impl="no"><td style="color:#a88">Arachne's Loom</td><td><span class="tag tag-form">Wave</span></td><td><span class="tag tag-behavior">Shatter</span></td><td><span class="tag tag-essence">Silk</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>Dame Ragnelle (post-curse)</td><td>Sine-wave shatters into web threads, netting the entire room</td></tr>
+<tr data-impl="no"><td style="color:#a88">Camelot's Ward</td><td><span class="tag tag-form">Orbit</span></td><td><span class="tag tag-behavior">Linger</span></td><td><span class="tag tag-essence">Pulse</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>Sir Gawain</td><td>Electrical field orbits you, leaving persistent shock perimeter</td></tr>
+<tr data-impl="no"><td style="color:#a88">Mordred's Trap</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Stasis</span></td><td><span class="tag tag-essence">Dark</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>Sir Kay</td><td>Dark landmines freeze time AND fear — stuck in place, terrified. Mordred's technique.</td></tr>
+<!-- CV-Inspired -->
+<tr data-impl="no"><td style="color:#a88">Cocytus</td><td><span class="tag tag-form">Orbit</span></td><td><span class="tag tag-behavior">Shatter</span></td><td><span class="tag tag-essence">Hollow</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>Lady of the Lake</td><td>Ice shards orbit, shatter outward on command</td></tr>
+<tr data-impl="no"><td style="color:#a88">Boreas' Gale</td><td><span class="tag tag-form">Saw</span></td><td><span class="tag tag-behavior">Bloom</span></td><td><span class="tag tag-essence">Hollow</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>Sir Yvain</td><td>Buzzsaw becomes tornado, drags enemies in</td></tr>
+<tr data-impl="no"><td style="color:#a88">Solomon's Seal</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Possess</span></td><td><span class="tag tag-essence">Bone</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>Sir Bors</td><td>Landmine summons skeleton champion on trigger</td></tr>
+<tr data-impl="no"><td style="color:#a88">Mjölnir's Mark</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Linger</span></td><td><span class="tag tag-essence">Pulse</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>Sir Dinadan</td><td>Lightning mine leaves persistent shock field</td></tr>
+<tr data-impl="no"><td style="color:#a88">Brynhildr</td><td><span class="tag tag-form">Orbit</span></td><td><span class="tag tag-behavior">Stasis</span></td><td><span class="tag tag-essence">Bone</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>Sir Brunor</td><td>Spinning bone swords orbit you, freezing on contact. Hardest combat puzzle.</td></tr>
+<tr data-impl="no"><td style="color:#a88">Fomorian's Charge</td><td><span class="tag tag-form">Bolt</span></td><td><span class="tag tag-behavior">Bloom</span></td><td><span class="tag tag-essence">Dark</span></td><td><span class="tag tag-notimpl">❌ Not Yet</span></td><td>The Green Knight (choice)</td><td>YOU become the projectile, rocketing forward as a shadow bullet. Alt choice vs Chronos' Chain.</td></tr>
+</tbody>
+</table>
+
+<h2 id="dual">Dual Combos (Two Slots)</h2>
+<p style="color:#666;font-size:12px;margin-bottom:8px;">Two slots filled, one empty. Named combos with enhanced effects.</p>
+
+<input type="search" id="dualSearch" placeholder="Search dual combos..." oninput="filterTable('dualTable', this.value)">
+
+<table id="dualTable">
+<thead>
+<tr><th>Combo Name</th><th>Slot 1</th><th>Slot 2</th><th>Type</th></tr>
+</thead>
+<tbody>
+<!-- Form + Behavior -->
+<tr><td style="color:#88aacc">Splinter Shot</td><td><span class="tag tag-form">Bolt</span></td><td><span class="tag tag-behavior">Shatter</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Signal Flare</td><td><span class="tag tag-form">Bolt</span></td><td><span class="tag tag-behavior">Linger</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Ricochet</td><td><span class="tag tag-form">Bolt</span></td><td><span class="tag tag-behavior">Bounce</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Comet</td><td><span class="tag tag-form">Bolt</span></td><td><span class="tag tag-behavior">Bloom</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Freeze Ray</td><td><span class="tag tag-form">Bolt</span></td><td><span class="tag tag-behavior">Stasis</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Hex Bolt</td><td><span class="tag tag-form">Bolt</span></td><td><span class="tag tag-behavior">Possess</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Firebomb</td><td><span class="tag tag-form">Shotgun</span></td><td><span class="tag tag-behavior">Linger</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Buckshot</td><td><span class="tag tag-form">Shotgun</span></td><td><span class="tag tag-behavior">Bounce</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Cluster Bomb</td><td><span class="tag tag-form">Shotgun</span></td><td><span class="tag tag-behavior">Shatter</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Undertow</td><td><span class="tag tag-form">Wave</span></td><td><span class="tag tag-behavior">Linger</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Echo</td><td><span class="tag tag-form">Wave</span></td><td><span class="tag tag-behavior">Bounce</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Tsunami</td><td><span class="tag tag-form">Wave</span></td><td><span class="tag tag-behavior">Bloom</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Bible</td><td><span class="tag tag-form">Orbit</span></td><td><span class="tag tag-behavior">Bounce</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Supernova</td><td><span class="tag tag-form">Orbit</span></td><td><span class="tag tag-behavior">Bloom</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Stasis Field</td><td><span class="tag tag-form">Orbit</span></td><td><span class="tag tag-behavior">Stasis</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Ball Lightning</td><td><span class="tag tag-form">Chain</span></td><td><span class="tag tag-behavior">Bounce</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Fork Lightning</td><td><span class="tag tag-form">Chain</span></td><td><span class="tag tag-behavior">Shatter</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Landmine</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Bloom</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Claymore</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Shatter</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Pop Green</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Bounce</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Frost Bulb</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Stasis</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Cordyceps</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Possess</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Creeping Moss</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-behavior">Linger</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Buzzsaw</td><td><span class="tag tag-form">Saw</span></td><td><span class="tag tag-behavior">Bounce</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Fragmentation</td><td><span class="tag tag-form">Nova</span></td><td><span class="tag tag-behavior">Shatter</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Flash Freeze</td><td><span class="tag tag-form">Nova</span></td><td><span class="tag tag-behavior">Stasis</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Death Ray</td><td><span class="tag tag-form">Lance</span></td><td><span class="tag tag-behavior">Bloom</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Scorched Earth</td><td><span class="tag tag-form">Lance</span></td><td><span class="tag tag-behavior">Linger</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Trick Shot</td><td><span class="tag tag-form">Volley</span></td><td><span class="tag tag-behavior">Bounce</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Barrage</td><td><span class="tag tag-form">Volley</span></td><td><span class="tag tag-behavior">Shatter</span></td><td class="combo-type">Form + Behavior</td></tr>
+<tr><td style="color:#88aacc">Summon Spirit</td><td><span class="tag tag-form">Volley</span></td><td><span class="tag tag-behavior">Possess</span></td><td class="combo-type">Form + Behavior</td></tr>
+<!-- Form + Essence -->
+<tr><td style="color:#88aacc">Fire Bolt</td><td><span class="tag tag-form">Bolt</span></td><td><span class="tag tag-essence">Cinder</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Shock Bolt</td><td><span class="tag tag-form">Bolt</span></td><td><span class="tag tag-essence">Pulse</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Shadow Bolt</td><td><span class="tag tag-form">Bolt</span></td><td><span class="tag tag-essence">Dark</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Thorn Bolt</td><td><span class="tag tag-form">Bolt</span></td><td><span class="tag tag-essence">Sap</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Ice Shard</td><td><span class="tag tag-form">Bolt</span></td><td><span class="tag tag-essence">Hollow</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Dragon Spit</td><td><span class="tag tag-form">Shotgun</span></td><td><span class="tag tag-essence">Cinder</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Bat Burst</td><td><span class="tag tag-form">Shotgun</span></td><td><span class="tag tag-essence">Dark</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Phantom Wave</td><td><span class="tag tag-form">Wave</span></td><td><span class="tag tag-essence">Hollow</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Muddy Water</td><td><span class="tag tag-form">Wave</span></td><td><span class="tag tag-essence">Sap</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Thunder Wave</td><td><span class="tag tag-form">Wave</span></td><td><span class="tag tag-essence">Pulse</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Flame Wheel</td><td><span class="tag tag-form">Orbit</span></td><td><span class="tag tag-essence">Cinder</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Dark Halo</td><td><span class="tag tag-form">Orbit</span></td><td><span class="tag tag-essence">Dark</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Arc Lightning</td><td><span class="tag tag-form">Chain</span></td><td><span class="tag tag-essence">Pulse</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Chain Fire</td><td><span class="tag tag-form">Chain</span></td><td><span class="tag tag-essence">Cinder</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Fire Trap</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-essence">Cinder</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Spore Mine</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-essence">Sap</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Nightshade</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-essence">Dark</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Shock Root</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-essence">Pulse</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Void Sprout</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-essence">Hollow</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Bone Garden</td><td><span class="tag tag-form">Seed</span></td><td><span class="tag tag-essence">Bone</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Bone Saw</td><td><span class="tag tag-form">Saw</span></td><td><span class="tag tag-essence">Bone</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Flame Disc</td><td><span class="tag tag-form">Saw</span></td><td><span class="tag tag-essence">Cinder</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Hellfire</td><td><span class="tag tag-form">Nova</span></td><td><span class="tag tag-essence">Cinder</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Eclipse</td><td><span class="tag tag-form">Nova</span></td><td><span class="tag tag-essence">Dark</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Sun Lance</td><td><span class="tag tag-form">Lance</span></td><td><span class="tag tag-essence">Cinder</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Void Beam</td><td><span class="tag tag-form">Lance</span></td><td><span class="tag tag-essence">Dark</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Storm Volley</td><td><span class="tag tag-form">Volley</span></td><td><span class="tag tag-essence">Pulse</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Bone Volley</td><td><span class="tag tag-form">Volley</span></td><td><span class="tag tag-essence">Bone</span></td><td class="combo-type">Form + Essence</td></tr>
+<tr><td style="color:#88aacc">Razor Leaf</td><td><span class="tag tag-form">Volley</span></td><td><span class="tag tag-essence">Sap</span></td><td class="combo-type">Form + Essence</td></tr>
+<!-- Behavior + Essence -->
+<tr><td style="color:#88aacc">Bone Shrapnel</td><td><span class="tag tag-behavior">Shatter</span></td><td><span class="tag tag-essence">Bone</span></td><td class="combo-type">Behavior + Essence</td></tr>
+<tr><td style="color:#88aacc">Fireworks</td><td><span class="tag tag-behavior">Shatter</span></td><td><span class="tag tag-essence">Cinder</span></td><td class="combo-type">Behavior + Essence</td></tr>
+<tr><td style="color:#88aacc">Bonfire</td><td><span class="tag tag-behavior">Linger</span></td><td><span class="tag tag-essence">Cinder</span></td><td class="combo-type">Behavior + Essence</td></tr>
+<tr><td style="color:#88aacc">Swamp</td><td><span class="tag tag-behavior">Linger</span></td><td><span class="tag tag-essence">Sap</span></td><td class="combo-type">Behavior + Essence</td></tr>
+<tr><td style="color:#88aacc">Tesla Ball</td><td><span class="tag tag-behavior">Bounce</span></td><td><span class="tag tag-essence">Pulse</span></td><td class="combo-type">Behavior + Essence</td></tr>
+<tr><td style="color:#88aacc">Bone Bounce</td><td><span class="tag tag-behavior">Bounce</span></td><td><span class="tag tag-essence">Bone</span></td><td class="combo-type">Behavior + Essence</td></tr>
+<tr><td style="color:#88aacc">Overgrowth</td><td><span class="tag tag-behavior">Bloom</span></td><td><span class="tag tag-essence">Sap</span></td><td class="combo-type">Behavior + Essence</td></tr>
+<tr><td style="color:#88aacc">Shadow Bloom</td><td><span class="tag tag-behavior">Bloom</span></td><td><span class="tag tag-essence">Dark</span></td><td class="combo-type">Behavior + Essence</td></tr>
+<tr><td style="color:#88aacc">Time Stop</td><td><span class="tag tag-behavior">Stasis</span></td><td><span class="tag tag-essence">Hollow</span></td><td class="combo-type">Behavior + Essence</td></tr>
+<tr><td style="color:#88aacc">Dark Pact</td><td><span class="tag tag-behavior">Possess</span></td><td><span class="tag tag-essence">Dark</span></td><td class="combo-type">Behavior + Essence</td></tr>
+</tbody>
+</table>
+
+<h2 id="quests">Quest Unlock Details</h2>
+<p style="color:#666;font-size:12px;margin-bottom:8px;">Full quest descriptions for each fusion with a quest path.</p>
+
+<input type="search" id="questSearch" placeholder="Search quests..." oninput="filterTable('questTable', this.value)">
+
+<table id="questTable">
+<thead>
+<tr><th>Fusion</th><th>Quest Giver</th><th>Zone</th><th class="quest-cell">Quest Description</th></tr>
+</thead>
+<tbody>
+<tr><td style="color:#d4af37">Dragon's Teeth</td><td>Sir Brunor</td><td>Ashlands (deep)</td><td class="quest-cell">"The Bone Fields are overrun. Something is raising the dead faster than they fall. End it." Clear a necromantic node guarded by endless skeleton waves.</td></tr>
+<tr><td style="color:#d4af37">Yggdrasil's Root</td><td>Dame Ragnelle</td><td>Wyldwood Hearth</td><td class="quest-cell">Break her curse by planting a Sap seed in enchanted ground and defending it as it grows. She describes the fusion as her "true memory."</td></tr>
+<tr><td style="color:#d4af37">Indra's Arrow</td><td>Sir Dinadan</td><td>Drowned Valley</td><td class="quest-cell">"There's a canyon full of iron pillars. Lightning jumps between them. Something lives in there and it's ANGRY." Navigate lightning puzzle, defeat Storm Caller alpha.</td></tr>
+<tr><td style="color:#d4af37">Event Horizon</td><td>Lady of the Lake</td><td>Drowned Valley (deep)</td><td class="quest-cell">Nimue speaks of a "wound in the world" — a void tear consuming everything. Reach it. Stabilize it. "You've seen the void. Now wield it."</td></tr>
+<tr><td style="color:#d4af37">Dragonbreath</td><td>Sir Yvain</td><td>Whispering Swamp</td><td class="quest-cell">His lion is dying from Fae frostbite. Track a fire-drake and harvest its flame gland. The drake IS the fusion preview.</td></tr>
+<tr><td style="color:#d4af37">Rift Tide</td><td>Sir Bors</td><td>Fractured Cathedral</td><td class="quest-cell">A holy well consumed by void corruption. Water moves in warped sine patterns. Purify by destroying void nodes. "The tide between worlds."</td></tr>
+<tr><td style="color:#d4af37">Death's Scythe</td><td>King Pellinore (ghost)</td><td>Swamp depths</td><td class="quest-cell">"My bloodline hunts what cannot be caught. Prove you are worthy." Gauntlet in bone-walled arena with endless bouncing projectiles.</td></tr>
+<tr><td style="color:#d4af37">Gáe Bolg</td><td>Sir Feirefiz</td><td>Cathedral outskirts</td><td class="quest-cell">If spared in Level 4: "A spear that freezes fate." Partial recipe + location where time stutters around lightning impacts. Survive time-distortion enemies.</td></tr>
+<tr><td style="color:#d4af37">Gebel's Swarm</td><td>Sir Dagonet</td><td>Wyldwood</td><td class="quest-cell">"I was hiding in a bell tower and these BAT THINGS went INTO the creatures—" The bell tower is real. Fight the dark bat swarm.</td></tr>
+<tr><td style="color:#d4af37">Surtr's Crown</td><td>Sir Brunor</td><td>Iron March border</td><td class="quest-cell">"A fire giant stalks the borderlands. It wears a crown of growing flame. Three knights tried. None returned." Solo boss — defeat it before the ring fills the arena.</td></tr>
+<tr><td style="color:#d4af37">Grave Call</td><td>Sir Dinadan</td><td>Ashlands</td><td class="quest-cell">"There's a graveyard where the dead bury themselves, and when you step on the graves, they EXPLODE upward. I am not making this up."</td></tr>
+<tr><td style="color:#d4af37">Tiamat's Garden</td><td>Henwen the Sow</td><td>Wyldwood (hidden)</td><td class="quest-cell">Follow the magical pig through a trail to a hidden garden. A Sap creature guards it. Recipe inscribed on a living leaf.</td></tr>
+<tr><td style="color:#d4af37">Chronos' Chain</td><td>The Green Knight</td><td>Wyldwood border</td><td class="quest-cell">Timed quest from Act I resolves in Act III. Time literally frozen at the crossroads. Fight the Green Knight in frozen space. "You understand patience. Now understand eternity."</td></tr>
+<tr><td style="color:#d4af37">Pillars of Muspelheim</td><td>Sir Gareth</td><td>Ashlands</td><td class="quest-cell">Defend Gareth's supply cache from Cinder-type siege waves. Recipe found in scorched journal on enemy corpse.</td></tr>
+<tr><td style="color:#d4af37">Vajra</td><td>Sir Dinadan</td><td>Drowned Valley</td><td class="quest-cell">"I threw a rock at something electrical and it SHATTERED INTO LIGHTNING. I'm done." The mineral deposit is real. Shatter it for the recipe.</td></tr>
+<tr><td style="color:#d4af37">Morrigan's Court</td><td>Sir Dagonet</td><td>Wyldwood (deep)</td><td class="quest-cell">"I watched dark spirits circle a throne for three hours. Too scared to leave. Actually kind of beautiful." The cave and throne are real.</td></tr>
+<tr><td style="color:#d4af37">Cocytus</td><td>Lady of the Lake</td><td>Drowned Valley (frozen)</td><td class="quest-cell">"The ice remembers what the water forgets." Frozen Fae battlefield with orbiting ice shards. Navigate, defeat frozen guardian, claim recipe from center.</td></tr>
+<tr><td style="color:#d4af37">Boreas' Gale</td><td>Sir Yvain</td><td>Whispering Swamp</td><td class="quest-cell">A tornado-like Fae entity destroying the swamp. Yvain's lion tracked it. Defeat it before it reaches inhabited area.</td></tr>
+<tr><td style="color:#d4af37">Solomon's Seal</td><td>Sir Bors</td><td>Cathedral (crypt)</td><td class="quest-cell">Ancient binding circle in crypt — summons skeletal guardians when triggered. Purify the corrupted seal.</td></tr>
+<tr><td style="color:#d4af37">Mjölnir's Mark</td><td>Sir Dinadan</td><td>Iron March</td><td class="quest-cell">"Someone left lightning landmines in a FIELD. Who DOES that?" Clear the minefield. Pulse artifact at center holds recipe.</td></tr>
+<tr><td style="color:#d4af37">Brynhildr</td><td>Sir Brunor</td><td>Wyldwood Hearth (deep)</td><td class="quest-cell">"A Valkyrie sleeps in a barrow. Her bone swords orbit endlessly, freezing anything near." Hardest combat puzzle in the game.</td></tr>
+<tr><td style="color:#d4af37">Fomorian's Charge</td><td>The Green Knight (choice)</td><td>Wyldwood border</td><td class="quest-cell">Alt reward during crossroads challenge. Combat trial: become a living shadow projectile. Choose this OR Chronos' Chain.</td></tr>
+<tr><td style="color:#d4af37">Ragnarök</td><td>Sir Brunor</td><td>—</td><td class="quest-cell">"A fire giant's heart still beats inside a dead colossus." Reach the interior, destroy the pulsing heart.</td></tr>
+<tr><td style="color:#d4af37">Rhongomyniad</td><td>Sir Kay</td><td>Camelot gate</td><td class="quest-cell">"The King's spear-technique. He can't wield it anymore. Someone should." Combat trial. Hardest single encounter in the game.</td></tr>
+<tr><td style="color:#d4af37">Morrígan's Flock</td><td>Sir Lamorak (ghost)</td><td>Drowned Valley</td><td class="quest-cell">Avenge Lamorak's murder. His killer's phantom uses this Fusion against you. Survive it, learn it.</td></tr>
+<tr><td style="color:#d4af37">Mistletoe's Chains</td><td>Sir Pelleas</td><td>Whispering Swamp</td><td class="quest-cell">After breaking his enchantment: "The Lady's garden had vines of lightning. They healed the earth." Find the garden.</td></tr>
+<tr><td style="color:#d4af37">Arondight's Shadow</td><td>Sir Tristan</td><td>Iron March</td><td class="quest-cell">Tristan tells of Lancelot's corrupted blade: "His blade left shadows." Find Lancelot's abandoned camp.</td></tr>
+<tr><td style="color:#d4af37">Niflheim Blast</td><td>Sir Dagonet</td><td>Wyldwood</td><td class="quest-cell">"I sneezed in a bone cave and everything FROZE and then SHATTERED and then MORE BONES and I ran." The cave is real.</td></tr>
+<tr><td style="color:#d4af37">Green Man's Embrace</td><td>Brother Caradoc</td><td>Fractured Cathedral</td><td class="quest-cell">The monk's garden is corrupted — plants possess wandering animals. Help purify it. Learn to control the effect.</td></tr>
+<tr><td style="color:#d4af37">Tesla's Volley</td><td>Sir Safir</td><td>Eastern ruins</td><td class="quest-cell">Palamedes' brother brings a message: "My brother says see the lightning gallery." Natural bouncing-lightning phenomenon.</td></tr>
+<tr><td style="color:#d4af37">Excalibur's Light</td><td>Parzival (finale)</td><td>Twilight Confluence</td><td class="quest-cell">The ONLY story-rewarded Fusion. Parzival speaks to Morien for the first and only time: "Take this. For what you've given." Post-game only.</td></tr>
+<tr><td style="color:#d4af37">Arachne's Loom</td><td>Dame Ragnelle (post-curse)</td><td>Wyldwood Hearth</td><td class="quest-cell">In true form, Ragnelle teaches Fae weaving: "The old magic moves in waves. When it breaks, it catches." Combat trial.</td></tr>
+<tr><td style="color:#d4af37">Camelot's Ward</td><td>Sir Gawain</td><td>Iron March bridge</td><td class="quest-cell">Gawain at the bridge: "I've held this position for nine days. Want to know how? Watch." Survive his wave.</td></tr>
+<tr><td style="color:#d4af37">Mordred's Trap</td><td>Sir Kay</td><td>Camelot</td><td class="quest-cell">Kay finds the recipe in Mordred's abandoned quarters. "The traitor left his notes." Uncomfortable to wield — it's Mordred's technique.</td></tr>
+</tbody>
+</table>
+
+<h2 id="npcs">NPC Roster</h2>
+<p style="color:#666;font-size:12px;margin-bottom:8px;">All named characters in the game.</p>
+
+<h3>Core Recurring NPCs</h3>
+<table class="npc-table">
+<thead><tr><th>NPC</th><th>Role</th><th>Location</th><th>Key Feature</th></tr></thead>
+<tbody>
+<tr><td>Sir Palamedes</td><td>Primary Merchant / Mentor</td><td>Level 2+, fixed camp</td><td>Inventory gates to story — upgrades massively post-twist. Was sandbagging.</td></tr>
+<tr><td>Sir Dinadan</td><td>Roaming Quest Giver</td><td>Different zones each visit</td><td>~15-20 quests. Best writing in the game. Cynical mask over deep loyalty.</td></tr>
+<tr><td>Sir Dagonet</td><td>Mobile Hint/Shop/Intel</td><td>Random hiding spots</td><td>The Fraud Knight. Map intel, fusion hints, junk merchant. Act III hero moment.</td></tr>
+<tr><td>Sir Brunor</td><td>Hard-Quest Giver</td><td>Fixed post</td><td>~8-10 quests. Hardest content, best rewards. The bloody coat. Entirely missable.</td></tr>
+<tr><td>Lady of the Lake (Nimue)</td><td>Hidden Merchant / Lore</td><td>Drowned Valley underwater</td><td>Rarest relics. Speaks in riddles. Knows the Sigh's origin.</td></tr>
+<tr><td>Sir Gareth</td><td>Budget Merchant</td><td>Ashlands front line</td><td>Fair prices. Humble, kind. The anti-Kay.</td></tr>
+<tr><td>Brother Caradoc</td><td>Healer / Blessed Items</td><td>Fractured Cathedral</td><td>Free healing. Anti-Fae blessed items.</td></tr>
+</tbody>
+</table>
+
+<h3>Story-Critical NPCs</h3>
+<table class="npc-table">
+<thead><tr><th>NPC</th><th>Role</th><th>Location</th><th>Key Moment</th></tr></thead>
+<tbody>
+<tr><td>Sir Aglovale</td><td>Tragic Boss</td><td>Level 5</td><td>Morien's father. Fae-corrupted. Dies revealing Morgan's deception.</td></tr>
+<tr><td>Sir Feirefiz</td><td>Optional Boss / Ally</td><td>Level 4</td><td>Fight or persuade. If spared → Gáe Bolg quest.</td></tr>
+<tr><td>Sir Bedivere</td><td>Dying Knight</td><td>Level 1</td><td>Gives shield + message for Arthur. First relic.</td></tr>
+<tr><td>Sir Gawain</td><td>Late-game Ally</td><td>Level 6 bridge</td><td>Gives horse. Camelot's Ward fusion quest.</td></tr>
+<tr><td>Sir Kay</td><td>Gatekeeper of Camelot</td><td>Camelot</td><td>Rude but loyal. Rhongomyniad + Mordred's Trap quests.</td></tr>
+<tr><td>Parzival</td><td>Background / Finale</td><td>Various (distance)</td><td>Speaks to Morien once. Gives Excalibur's Light.</td></tr>
+</tbody>
+</table>
+
+<h3>Quest-Giving NPCs</h3>
+<table class="npc-table">
+<thead><tr><th>NPC</th><th>Quest Type</th><th>Zone</th><th>Rewards</th></tr></thead>
+<tbody>
+<tr><td>Sir Yvain</td><td>Beast hunts</td><td>Whispering Swamp</td><td>Dragonbreath + Boreas' Gale recipes</td></tr>
+<tr><td>Sir Bors</td><td>Holy site defense</td><td>Fractured Cathedral</td><td>Rift Tide + Solomon's Seal recipes</td></tr>
+<tr><td>Sir Pelleas</td><td>Rescue (break charm)</td><td>Whispering Swamp</td><td>Ring + Mistletoe's Chains recipe</td></tr>
+<tr><td>Sir Tor</td><td>Escort mission</td><td>Ashlands</td><td>Unlocks ally at Palamedes' camp</td></tr>
+<tr><td>Sir Tristan</td><td>Heal wounded knight</td><td>Iron March</td><td>Relic + Arondight's Shadow recipe (missable)</td></tr>
+<tr><td>Dame Ragnelle</td><td>Curse-breaking</td><td>Wyldwood Hearth</td><td>Yggdrasil's Root + Arachne's Loom recipes</td></tr>
+<tr><td>The Green Knight</td><td>Honor challenge (branching)</td><td>Wyldwood border</td><td>Fomorian's Charge OR Chronos' Chain</td></tr>
+<tr><td>Old King Pellinore</td><td>Ghost (fight or talk)</td><td>Swamp depths</td><td>Death's Scythe recipe OR Questing Beast intel</td></tr>
+<tr><td>Sir Safir</td><td>Messenger / delivery</td><td>Roaming</td><td>Tesla's Volley recipe, minor components</td></tr>
+<tr><td>Sir Lamorak (ghost)</td><td>Vengeance quest</td><td>Drowned Valley</td><td>Morrígan's Flock recipe + Pellinore lore</td></tr>
+<tr><td>Henwen the Sow</td><td>Follow the pig</td><td>Various</td><td>Tiamat's Garden recipe, hidden rooms, buried treasure</td></tr>
+</tbody>
+</table>
+
+<h3>Lore / Atmosphere NPCs</h3>
+<table class="npc-table">
+<thead><tr><th>NPC</th><th>Type</th><th>Zone</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Sir Marhaus</td><td>Dead body / environmental</td><td>Ashlands</td><td>Tristan's sword shard in skull. Lore + weapon component.</td></tr>
+<tr><td>Mordred</td><td>Appears once, watches, leaves</td><td>Mid-game</td><td>No dialogue. Pure dread.</td></tr>
+</tbody>
+</table>
+
+<h3>Villains</h3>
+<table class="npc-table">
+<thead><tr><th>Villain</th><th>Type</th><th>Archetype</th><th>Key Trait</th></tr></thead>
+<tbody>
+<tr><td>Morgan le Fay</td><td>Primary Antagonist</td><td>The Aizen</td><td>Always calm. "I was the backup plan." Justice Antagonist who might be right.</td></tr>
+<tr><td>King Oberon</td><td>Fae Sovereign</td><td>World Antagonist</td><td>Finds the war amusing. Inhuman indifference. Screen warps near him.</td></tr>
+<tr><td>Queen Titania</td><td>Fae Sovereign</td><td>World Antagonist</td><td>Actively hostile. Views humans as invasive pests.</td></tr>
+<tr><td>Mordred</td><td>Political Threat</td><td>Sequel Griffith</td><td>Never fought. Pure ambition. Makes other villains nervous.</td></tr>
+<tr><td>Cerdic of Wessex</td><td>Steel Tides Leader</td><td>Justice Antagonist</td><td>His people are starving. Not a monster, just desperate.</td></tr>
+</tbody>
+</table>
+
+<script>
+function filterTable(tableId, query) {
+  const rows = document.getElementById(tableId).querySelectorAll('tbody tr');
+  const q = query.toLowerCase();
+  rows.forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+function filterImpl(filter, btn) {
+  document.querySelectorAll('#implFilter button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const rows = document.getElementById('fusionTable').querySelectorAll('tbody tr');
+  rows.forEach(row => {
+    if (filter === 'all') { row.style.display = ''; return; }
+    row.style.display = row.dataset.impl === filter ? '' : 'none';
+  });
+}
+</script>
+
+</body>
+</html>

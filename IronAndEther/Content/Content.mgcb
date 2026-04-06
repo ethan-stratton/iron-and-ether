@@ -1,0 +1,95 @@
+
+#----------------------------- Global Properties ----------------------------#
+
+/outputDir:bin/$(Platform)
+/intermediateDir:obj/$(Platform)
+/platform:DesktopGL
+/config:
+/profile:Reach
+/compress:False
+
+#-------------------------------- References --------------------------------#
+
+
+#---------------------------------- Content ---------------------------------#
+
+#begin DefaultFont.spritefont
+/importer:FontDescriptionImporter
+/processor:FontDescriptionProcessor
+/build:DefaultFont.spritefont
+
+#begin SotNFont.spritefont
+/importer:FontDescriptionImporter
+/processor:FontDescriptionProcessor
+/build:SotNFont.spritefont
+
+#begin TitleFont.spritefont
+/importer:FontDescriptionImporter
+/processor:FontDescriptionProcessor
+/build:TitleFont.spritefont
+
+# --- Music: Fantasy RPG ---
+
+#begin Music/Ambient1.ogg
+/importer:OggImporter
+/processor:SongProcessor
+/build:Music/Ambient1.ogg;Music/Ambient1
+
+#begin Music/LightAmbient1.ogg
+/importer:OggImporter
+/processor:SongProcessor
+/build:Music/LightAmbient1.ogg;Music/LightAmbient1
+
+#begin Music/LightAmbient3.ogg
+/importer:OggImporter
+/processor:SongProcessor
+/build:Music/LightAmbient3.ogg;Music/LightAmbient3
+
+#begin Music/NightAmbient2.ogg
+/importer:OggImporter
+/processor:SongProcessor
+/build:Music/NightAmbient2.ogg;Music/NightAmbient2
+
+#begin Music/Action1.ogg
+/importer:OggImporter
+/processor:SongProcessor
+/build:Music/Action1.ogg;Music/Action1
+
+#begin Music/Action3.ogg
+/importer:OggImporter
+/processor:SongProcessor
+/build:Music/Action3.ogg;Music/Action3
+
+#begin Music/Strange.ogg
+/importer:OggImporter
+/processor:SongProcessor
+/build:Music/Strange.ogg;Music/Strange
+
+#begin Music/Victory.ogg
+/importer:OggImporter
+/processor:SongProcessor
+/build:Music/Victory.ogg;Music/Victory
+
+#begin Music/Death.ogg
+/importer:OggImporter
+/processor:SongProcessor
+/build:Music/Death.ogg;Music/Death
+
+#begin Music/Complete.ogg
+/importer:OggImporter
+/processor:SongProcessor
+/build:Music/Complete.ogg;Music/Complete
+
+# --- Music: Boss Battle ---
+
+#begin Music/BossAbyssalTyrant.ogg
+/importer:OggImporter
+/processor:SongProcessor
+/build:Music/BossAbyssalTyrant.ogg;Music/BossAbyssalTyrant
+
+#begin Music/BossDreadRequiem.ogg
+/importer:OggImporter
+/processor:SongProcessor
+/build:Music/BossDreadRequiem.ogg;Music/BossDreadRequiem
+
+
