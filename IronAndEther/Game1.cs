@@ -239,7 +239,7 @@ public class Game1 : Game
     private Vector2 _ledgeHopTarget;
     private Vector2 _ledgeHopStart;
     private const float LedgeHopDuration = 0.35f; // time to complete hop
-    private const float LedgeHopHoldTime = 0.15f; // hold time before hop triggers
+    private const float LedgeHopHoldTime = 0.3f; // hold time before hop triggers
     private float _ledgeHoldTimer = 0f; // how long player has been pushing into one-way wall
     private int _ledgeHoldDir = 0; // which one-way direction is being held into
     private float _inventorySlide = 0f; // 0=closed, 1=fully open
@@ -851,6 +851,7 @@ public class Game1 : Game
     private float _walkAnimTimer = 0f;
     private int _walkFrame = 0; // 0,1,2 walk cycle
     private int _facingDir = 0; // 0=down, 1=left, 2=right, 3=up
+    private bool _showHitboxes = false; // F1 debug toggle
     private bool _hasSword = false;
     private float _swordTimer;         // counts down during swing
     private float _swordCooldown;      // cooldown between swings
@@ -1837,6 +1838,8 @@ public class Game1 : Game
             _inventoryOpen = !_inventoryOpen;
             if (!_inventoryOpen) DropOverflowToGround();
         }
+        if (kb.IsKeyDown(Keys.F1) && !_prevKb.IsKeyDown(Keys.F1))
+            _showHitboxes = !_showHitboxes;
         
         // Always track mouse for inventory hover
         _mouseWorld = new Vector2(mouse.X + _cameraOffset.X, mouse.Y + _cameraOffset.Y);
@@ -3079,7 +3082,17 @@ public class Game1 : Game
                         _ledgeHoldTimer = 0f;
                         _ledgeHoldDir = pushing ? ow : 0;
                     }
-                    // One-way walls NEVER block — they only trigger hops
+                    // One-way walls block movement from the WRONG direction
+                    // ow=1 (hop up): block from below (can't walk up through)
+                    // ow=2 (hop down): block from below (can't walk up through) — wait, reversed:
+                    // ow=2 (hop down): player hops downward, so block upward movement (pushUp)
+                    bool blocked = false;
+                    if (ow == 1) { if (minPush == pushUp) { _playerPos.Y -= pushUp; blocked = true; } }      // block from south
+                    if (ow == 2) { if (minPush == pushDown) { _playerPos.Y += pushDown; blocked = true; } }   // block from north
+                    if (ow == 3) { if (minPush == pushLeft) { _playerPos.X -= pushLeft; blocked = true; } }   // block from east
+                    if (ow == 4) { if (minPush == pushRight) { _playerPos.X += pushRight; blocked = true; } } // block from west
+                    if (blocked)
+                        playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2), (int)PlayerSize, (int)PlayerSize);
                     continue;
                 }
                 
@@ -21825,6 +21838,43 @@ public class Game1 : Game
         if (playerVisible)
             DrawPlayer(_playerPos + new Vector2(0, -_jumpHeight), aimDir, playerColor, (float)gameTime.TotalGameTime.TotalSeconds, essColor, _jumpHeight);
         
+        // Debug hitboxes (F1)
+        if (_showHitboxes)
+        {
+            // Player collision box (green)
+            int phbX = (int)(_playerPos.X - PlayerSize / 2);
+            int phbY = (int)(_playerPos.Y - PlayerSize / 2);
+            int phbS = (int)PlayerSize;
+            DrawRect(phbX, phbY, phbS, 1, Color.Lime);
+            DrawRect(phbX, phbY + phbS - 1, phbS, 1, Color.Lime);
+            DrawRect(phbX, phbY, 1, phbS, Color.Lime);
+            DrawRect(phbX + phbS - 1, phbY, 1, phbS, Color.Lime);
+            // Center dot
+            DrawRect((int)_playerPos.X - 1, (int)_playerPos.Y - 1, 3, 3, Color.Lime);
+            
+            // Wall collision rects
+            if (_screenWalls.TryGetValue(_currentScreen, out var dbgWalls))
+            {
+                _screenWallOneWay.TryGetValue(_currentScreen, out var dbgOw);
+                for (int di = 0; di < dbgWalls.Count; di++)
+                {
+                    var dw = dbgWalls[di];
+                    int dow = (dbgOw != null && di < dbgOw.Count) ? dbgOw[di] : 0;
+                    Color dc = dow > 0 ? Color.CornflowerBlue : Color.Red;
+                    DrawRect(dw.X, dw.Y, dw.Width, 1, dc);
+                    DrawRect(dw.X, dw.Y + dw.Height - 1, dw.Width, 1, dc);
+                    DrawRect(dw.X, dw.Y, 1, dw.Height, dc);
+                    DrawRect(dw.X + dw.Width - 1, dw.Y, 1, dw.Height, dc);
+                    if (dow > 0)
+                    {
+                        string[] arrows = { "", "↑", "↓", "←", "→" };
+                        DrawTextFallback(dw.X + 2, dw.Y + 2, arrows[dow], Color.CornflowerBlue, 0.5f);
+                    }
+                }
+            }
+            DrawTextFallback(4, ScreenH - 16, "F1: HITBOXES ON", Color.Lime * 0.6f, 0.5f);
+        }
+        
         // FG overlay tiles drawn AFTER player — tree canopies etc. obscure the player
         if (!_inCave) DrawTiledFloorFG();
 
@@ -26463,7 +26513,7 @@ public class Game1 : Game
             var srcRect = new Rectangle(srcX, srcY, KF_W, KF_H);
             float scale = 2.5f; // 26×36 → 65×90 display
             var origin = new Vector2(KF_W / 2f, KF_H - 4f); // anchor at feet
-            var drawPos = new Vector2(pos.X, pos.Y + PlayerSize / 2f);
+            var drawPos = new Vector2(pos.X, pos.Y + PlayerSize / 2f + 6f); // +6 to lower sprite
             
             // Hit flash
             Color spriteTint = tint;
