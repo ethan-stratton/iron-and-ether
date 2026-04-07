@@ -826,6 +826,7 @@ public class Game1 : Game
     private bool _isDashing;
 
     // Sword
+    private Texture2D _swordTex; // Exotic Swords sprite sheet
     private bool _hasSword = false;
     private float _swordTimer;         // counts down during swing
     private float _swordCooldown;      // cooldown between swings
@@ -1471,6 +1472,15 @@ public class Game1 : Game
             _tileset = Texture2D.FromStream(GraphicsDevice, stream);
             System.Console.WriteLine($"Tileset loaded: {_tileset.Width}x{_tileset.Height}");
             InitTileMaps();
+        }
+        
+        // Load sword sprite sheet
+        string swordPath = System.IO.Path.Combine(Content.RootDirectory, "Exotic Swords.png");
+        if (System.IO.File.Exists(swordPath))
+        {
+            using var swordStream = System.IO.File.OpenRead(swordPath);
+            _swordTex = Texture2D.FromStream(GraphicsDevice, swordStream);
+            System.Console.WriteLine($"Sword sheet loaded: {_swordTex.Width}x{_swordTex.Height}");
         }
         else
         {
@@ -25578,7 +25588,9 @@ public class Game1 : Game
             int gr = (mouse.Y - camGY) / TSDst;
             if (gc >= 0 && gc < roomCols && gr >= 0 && gr < roomRows)
             {
-                var data = _trActiveLayer == 0 ? GetOrCreateRoomTiles(_trPaintRoom) : GetOrCreateRoomOverlay(_trPaintRoom);
+                // When viewing a specific layer, erase from that layer; otherwise use active layer
+                int eraseLayer = _trLayerView == 1 ? 0 : _trLayerView == 2 ? 1 : _trActiveLayer;
+                var data = eraseLayer == 0 ? GetOrCreateRoomTiles(_trPaintRoom) : GetOrCreateRoomOverlay(_trPaintRoom);
                 data[gr, gc] = (-1, -1);
             }
         }
@@ -26308,6 +26320,34 @@ public class Game1 : Game
             // Sweep from -45° to +45° over the swing duration
             float sweepAngle = baseAngle + MathHelper.Lerp(-SwordArc / 2f, SwordArc / 2f, swingProgress);
             
+            if (_swordTex != null)
+            {
+                // Draw sprite sword — top-left 16×16 from sheet, scaled up, rotated along sweep
+                var srcRect = new Rectangle(0, 0, 16, 16);
+                int drawSize = 48; // 3x scale
+                var origin = new Vector2(8, 14); // pivot near hilt (bottom-center of 16×16)
+                float dist = 20f; // distance from player center to sword pivot
+                float sx = pos.X + MathF.Cos(sweepAngle) * dist;
+                float sy = pos.Y + MathF.Sin(sweepAngle) * dist;
+                // Rotate sword to point outward (+90° because sprite points up)
+                float rot = sweepAngle + MathF.PI / 2f;
+                _spriteBatch.Draw(_swordTex, new Vector2(sx, sy), srcRect, Color.White,
+                    rot, origin, drawSize / 16f, Microsoft.Xna.Framework.Graphics.SpriteEffects.None, 0f);
+                
+                // Trail afterimages
+                for (int t = 1; t <= 3; t++)
+                {
+                    float trailAngle = sweepAngle - (SwordArc / 8f) * t;
+                    float trailAlpha = (1f - t / 4f) * 0.3f;
+                    float tsx = pos.X + MathF.Cos(trailAngle) * dist;
+                    float tsy = pos.Y + MathF.Sin(trailAngle) * dist;
+                    float trot = trailAngle + MathF.PI / 2f;
+                    _spriteBatch.Draw(_swordTex, new Vector2(tsx, tsy), srcRect, Color.White * trailAlpha,
+                        trot, origin, drawSize / 16f, Microsoft.Xna.Framework.Graphics.SpriteEffects.None, 0f);
+                }
+            }
+            else
+            {
             Color bladeColor = new Color(200, 210, 220);
             Color trailColor = new Color(180, 190, 200) * (0.6f - swingProgress * 0.4f);
             
@@ -26337,6 +26377,7 @@ public class Game1 : Game
             float tipX = pos.X + MathF.Cos(sweepAngle) * (SwordRange - 4);
             float tipY = pos.Y + MathF.Sin(sweepAngle) * (SwordRange - 4);
                         DrawRect((int)tipX - 1, (int)tipY - 1, 3, 3, Color.White * (0.8f - swingProgress * 0.6f));
+            } // end else (fallback rect sword)
         }
         END OF ORIGINAL KNIGHT DESIGN */
     }
