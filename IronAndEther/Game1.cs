@@ -731,6 +731,11 @@ public class Game1 : Game
     private int _playerFacing = 1;
 
     private Loadout _loadout = new(Form.Bolt, Behavior.None, Essence.None);
+    private Loadout _loadoutSecondary = Loadout.Empty; // Q-swap partner
+    private Essence _utilityEssence = Essence.None; // E key, no EP cost
+    private bool _loadoutIsPrimary = true; // true = _loadout is primary, false = secondary is active
+    private float _loadoutSwapTimer = 0f; // visual swap animation
+    private const float LoadoutSwapDuration = 0.2f;
     private float _fireTimer;
 
     private List<Projectile> _projectiles = new();
@@ -2197,6 +2202,67 @@ public class Game1 : Game
                     fx += w + InvItemGap;
                 }
                 
+                // Secondary loadout — Form options
+                fx = InvPanelX + InvItemIndent;
+                foreach (var f in _unlockedForms)
+                {
+                    if (f == Form.None) continue;
+                    string fn = f.ToString();
+                    int w = MeasureText(fn);
+                    if (mx >= fx && mx <= fx + w && my >= InvSecFormY - 2 && my <= InvSecFormY + 18)
+                    {
+                        _loadoutSecondary.Form = (f == _loadoutSecondary.Form) ? Form.None : f;
+                        changed = true;
+                        break;
+                    }
+                    fx += w + InvItemGap;
+                }
+                // Secondary — Behavior options
+                fx = InvPanelX + InvItemIndent;
+                foreach (var b in _unlockedBehaviors)
+                {
+                    if (b == Behavior.None) continue;
+                    string bn = b.ToString();
+                    int w = MeasureText(bn);
+                    if (mx >= fx && mx <= fx + w && my >= InvSecBehY - 2 && my <= InvSecBehY + 18)
+                    {
+                        _loadoutSecondary.Behavior = (b == _loadoutSecondary.Behavior) ? Behavior.None : b;
+                        changed = true;
+                        break;
+                    }
+                    fx += w + InvItemGap;
+                }
+                // Secondary — Essence options
+                fx = InvPanelX + InvItemIndent;
+                foreach (var e in _unlockedEssences)
+                {
+                    if (e == Essence.None) continue;
+                    string en = e.ToString();
+                    int w = MeasureText(en);
+                    if (mx >= fx && mx <= fx + w && my >= InvSecEssY - 2 && my <= InvSecEssY + 18)
+                    {
+                        _loadoutSecondary.Essence = (e == _loadoutSecondary.Essence) ? Essence.None : e;
+                        changed = true;
+                        break;
+                    }
+                    fx += w + InvItemGap;
+                }
+                
+                // Utility essence options
+                fx = InvPanelX + InvItemIndent;
+                foreach (var e in _unlockedEssences)
+                {
+                    if (e == Essence.None) continue;
+                    string en = e.ToString();
+                    int w = MeasureText(en);
+                    if (mx >= fx && mx <= fx + w && my >= InvUtilItemsY - 2 && my <= InvUtilItemsY + 18)
+                    {
+                        _utilityEssence = (e == _utilityEssence) ? Essence.None : e;
+                        break;
+                    }
+                    fx += w + InvItemGap;
+                }
+                
                 if (changed) RefreshCombo();
                 
                 // Right column dropdown click handling
@@ -2510,6 +2576,15 @@ public class Game1 : Game
                 _dashCooldown = DashCooldownTime;
             }
         }
+
+        // Loadout swap — Q key
+        if (kb.IsKeyDown(Keys.Q) && !_prevKb.IsKeyDown(Keys.Q))
+        {
+            (_loadout, _loadoutSecondary) = (_loadoutSecondary, _loadout);
+            _loadoutIsPrimary = !_loadoutIsPrimary;
+            _loadoutSwapTimer = LoadoutSwapDuration;
+        }
+        if (_loadoutSwapTimer > 0) _loadoutSwapTimer -= dt;
 
         // Sword swing — Shift key
         _swordCooldown -= dt;
@@ -20556,6 +20631,16 @@ public class Game1 : Game
     private int InvBehItemsY => InvBehLabelY + InvLabelH;
     private int InvEssLabelY => InvBehItemsY + InvRowGap;
     private int InvEssItemsY => InvEssLabelY + InvLabelH;
+    
+    // Secondary loadout section (below primary)
+    private int InvSecHeaderY => InvEssItemsY + InvRowGap + 10;
+    private int InvSecFormY => InvSecHeaderY + InvLabelH;
+    private int InvSecBehY => InvSecFormY + InvRowGap;
+    private int InvSecEssY => InvSecBehY + InvRowGap;
+    
+    // Utility essence section
+    private int InvUtilLabelY => InvSecEssY + InvRowGap + 10;
+    private int InvUtilItemsY => InvUtilLabelY + InvLabelH;
 
     private void RefreshCombo()
     {
@@ -26495,16 +26580,56 @@ public class Game1 : Game
         END OF ORIGINAL KNIGHT DESIGN */
     }
 
+    private static Color GetEssenceColor(Essence e) => e switch
+    {
+        Essence.Cinder => new Color(255, 100, 30),
+        Essence.Dark => new Color(120, 40, 160),
+        Essence.Bone => new Color(220, 220, 210),
+        Essence.Silk => new Color(180, 100, 220),
+        Essence.Pulse => new Color(255, 240, 60),
+        Essence.Hollow => new Color(60, 200, 255),
+        Essence.Sap => new Color(60, 180, 60),
+        _ => new Color(200, 200, 200),
+    };
+
     private void DrawHUD()
     {
         int hudY = 10;
         var parms = ProjectileParams.Resolve(_loadout);
         var essenceColor = new Color(parms.Color.R, parms.Color.G, parms.Color.B);
 
+        // Active loadout label
+        string activeLabel = _loadoutIsPrimary ? "[P]" : "[S]";
+        Color activeLabelCol = _loadoutIsPrimary ? new Color(255, 200, 100) : new Color(100, 200, 255);
+        
+        // Swap flash
+        float swapAlpha = _loadoutSwapTimer > 0 ? _loadoutSwapTimer / LoadoutSwapDuration : 0f;
+        
         string formDisplay = _hasWand ? _loadout.FormName : "---";
         DrawSlotBox(42, hudY, "1:FORM", formDisplay, new Color(200, 80, 80));
         DrawSlotBox(202, hudY, "2:BEHAVIOR", _loadout.BehaviorName, new Color(80, 200, 80));
         DrawSlotBox(362, hudY, "3:ESSENCE", _loadout.EssenceName, essenceColor);
+        
+        // Active loadout indicator + Q hint
+        DrawTextFallback(10, hudY + 4, activeLabel, activeLabelCol);
+        
+        // Secondary loadout preview (smaller, dimmed, below primary)
+        Color hudDimCol = Color.Gray * 0.5f;
+        string secForm = _loadoutSecondary.Form == Form.None ? "---" : _loadoutSecondary.FormName;
+        string secBeh = _loadoutSecondary.Behavior == Behavior.None ? "---" : _loadoutSecondary.BehaviorName;
+        string secEss = _loadoutSecondary.Essence == Essence.None ? "---" : _loadoutSecondary.EssenceName;
+        DrawTextFallback(42, hudY + 38, $"Q: {secForm} / {secBeh} / {secEss}", hudDimCol, 0.8f);
+        
+        // Utility essence (right side)
+        string utilName = _utilityEssence == Essence.None ? "---" : _utilityEssence.ToString();
+        Color utilColor = _utilityEssence == Essence.None ? Color.Gray : GetEssenceColor(_utilityEssence);
+        DrawSlotBox(ScreenW - 170, hudY, "E:UTILITY", utilName, utilColor);
+        
+        // Swap flash overlay
+        if (swapAlpha > 0)
+        {
+            DrawRect(40, hudY - 2, 482, 36, Color.White * (swapAlpha * 0.3f));
+        }
 
         string comboName = _currentFusion ?? _currentDualCombo ?? _loadout.ComboName;
         Color comboColor = _currentFusion != null ? new Color(255, 215, 0) : _currentDualCombo != null ? new Color(150, 200, 255) : Color.White;
@@ -26992,6 +27117,69 @@ public class Game1 : Game
                     fx += tw + InvItemGap;
                 }
                 cy = InvEssItemsY + 36;
+                
+                // ═══ SECONDARY LOADOUT (Q-swap) ═══
+                DrawTextFallback(cx, InvSecHeaderY, "SECONDARY LOADOUT [Q]", new Color(100, 200, 255) * alpha, 1.1f);
+                
+                // Secondary Form
+                DrawTextFallback(cx, InvSecFormY - InvLabelH, "FORM", new Color(200, 80, 80) * alpha * 0.7f);
+                fx = cx + InvItemIndent;
+                foreach (var f in _unlockedForms)
+                {
+                    if (f == Form.None) continue;
+                    string fn = f.ToString();
+                    int tw = MeasureText(fn);
+                    bool active = f == _loadoutSecondary.Form;
+                    bool hover = _mouseWorld.X >= fx && _mouseWorld.X <= fx + tw && _mouseWorld.Y >= InvSecFormY - 2 && _mouseWorld.Y <= InvSecFormY + 18;
+                    Color fc = active ? new Color(100, 200, 255) * alpha : (hover ? Color.White * alpha : dimCol);
+                    DrawTextFallback(fx, InvSecFormY, fn, fc);
+                    fx += tw + InvItemGap;
+                }
+                
+                // Secondary Behavior
+                DrawTextFallback(cx, InvSecBehY - InvLabelH, "BEHAVIOR", new Color(80, 200, 80) * alpha * 0.7f);
+                fx = cx + InvItemIndent;
+                foreach (var b in _unlockedBehaviors)
+                {
+                    if (b == Behavior.None) continue;
+                    string bn = b.ToString();
+                    int tw = MeasureText(bn);
+                    bool active = b == _loadoutSecondary.Behavior;
+                    bool hover = _mouseWorld.X >= fx && _mouseWorld.X <= fx + tw && _mouseWorld.Y >= InvSecBehY - 2 && _mouseWorld.Y <= InvSecBehY + 18;
+                    Color bc = active ? new Color(100, 200, 255) * alpha : (hover ? Color.White * alpha : dimCol);
+                    DrawTextFallback(fx, InvSecBehY, bn, bc);
+                    fx += tw + InvItemGap;
+                }
+                
+                // Secondary Essence
+                DrawTextFallback(cx, InvSecEssY - InvLabelH, "ESSENCE", essCol * 0.7f);
+                fx = cx + InvItemIndent;
+                foreach (var e in _unlockedEssences)
+                {
+                    if (e == Essence.None) continue;
+                    string en = e.ToString();
+                    int tw = MeasureText(en);
+                    bool active = e == _loadoutSecondary.Essence;
+                    bool hover = _mouseWorld.X >= fx && _mouseWorld.X <= fx + tw && _mouseWorld.Y >= InvSecEssY - 2 && _mouseWorld.Y <= InvSecEssY + 18;
+                    Color ec = active ? new Color(100, 200, 255) * alpha : (hover ? Color.White * alpha : dimCol);
+                    DrawTextFallback(fx, InvSecEssY, en, ec);
+                    fx += tw + InvItemGap;
+                }
+                
+                // ═══ UTILITY ESSENCE [E] ═══
+                DrawTextFallback(cx, InvUtilLabelY, "UTILITY ESSENCE [E]", new Color(60, 220, 160) * alpha, 1.1f);
+                fx = cx + InvItemIndent;
+                foreach (var e in _unlockedEssences)
+                {
+                    if (e == Essence.None) continue;
+                    string en = e.ToString();
+                    int tw = MeasureText(en);
+                    bool active = e == _utilityEssence;
+                    bool hover = _mouseWorld.X >= fx && _mouseWorld.X <= fx + tw && _mouseWorld.Y >= InvUtilItemsY - 2 && _mouseWorld.Y <= InvUtilItemsY + 18;
+                    Color ec = active ? new Color(60, 220, 160) * alpha : (hover ? Color.White * alpha : dimCol);
+                    DrawTextFallback(fx, InvUtilItemsY, en, ec);
+                    fx += tw + InvItemGap;
+                }
                 
                 // Current combo
                 if (_currentFusion != null)
