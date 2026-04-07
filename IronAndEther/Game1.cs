@@ -2845,10 +2845,10 @@ public class Game1 : Game
                 // ow=2: can pass from south → skip pushDown
                 // ow=3: can pass from west → skip pushLeft  
                 // ow=4: can pass from east → skip pushRight
-                if (ow == 1 && minPush == pushUp) continue;
-                if (ow == 2 && minPush == pushDown) continue;
-                if (ow == 3 && minPush == pushLeft) continue;
-                if (ow == 4 && minPush == pushRight) continue;
+                if (ow == 1 && minPush == pushUp) { if (!_isJumping) { _isJumping = true; _jumpVelocity = JumpStrength * 0.5f; } continue; }
+                if (ow == 2 && minPush == pushDown) { if (!_isJumping) { _isJumping = true; _jumpVelocity = JumpStrength * 0.5f; } continue; }
+                if (ow == 3 && minPush == pushLeft) { if (!_isJumping) { _isJumping = true; _jumpVelocity = JumpStrength * 0.5f; } continue; }
+                if (ow == 4 && minPush == pushRight) { if (!_isJumping) { _isJumping = true; _jumpVelocity = JumpStrength * 0.5f; } continue; }
                 
                 if (minPush == pushLeft) _playerPos.X -= pushLeft;
                 else if (minPush == pushRight) _playerPos.X += pushRight;
