@@ -2916,10 +2916,11 @@ public class Game1 : Game
                 if (_wailDebuffTimer > 0) move = -move; // inverted movement
                 _playerPos += move * PlayerSpeed * (_webSlowTimer > 0 ? 0.4f : 1f) * dt;
                 
-                // Walk animation + facing direction
-                _walkAnimTimer += dt * 6f; // 6 frames/sec walk cycle
-                if (_walkAnimTimer >= 3f) _walkAnimTimer -= 3f;
-                _walkFrame = (int)_walkAnimTimer;
+                // Walk animation + facing direction (ping-pong: 0-1-2-1-0-1-2...)
+                _walkAnimTimer += dt * 6f;
+                if (_walkAnimTimer >= 4f) _walkAnimTimer -= 4f;
+                int raw = (int)_walkAnimTimer;
+                _walkFrame = raw < 3 ? raw : 4 - raw; // 0,1,2,1
                 // Determine facing from movement direction
                 if (MathF.Abs(move.X) > MathF.Abs(move.Y))
                     _facingDir = move.X < 0 ? 1 : 2; // left or right
