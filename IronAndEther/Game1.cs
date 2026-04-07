@@ -28,7 +28,8 @@ public class Game1 : Game
     // OpenRPG tilesets (16×16 base, 480×256 sheets, CC0)
     private Texture2D _tsDungeon, _tsExterior, _tsInterior, _tsShip, _tsWorld;
     private Texture2D[] _tsSheets;  // indexed array for easy access
-    private string[] _tsNames = { "dungeon", "exterior", "interior", "ship", "world" };
+    private string[] _tsNames = { "dungeon", "exterior", "interior", "ship", "world", "ashlands" };
+    private string[] _tsPaths = { "openRPG_Tilesets_5/dungeon", "openRPG_Tilesets_5/exterior", "openRPG_Tilesets_5/interior", "openRPG_Tilesets_5/ship", "openRPG_Tilesets_5/world", "tf_ashlands/ashlands_tileset" };
     private const int TS16 = 16; // source tile size for OpenRPG tilesets
     private const int TSDst = 48; // display size (16 × 3)
     private const int TSRoomCols = 27; // 1280 / 48 = 26.7, round up
@@ -1506,11 +1507,11 @@ public class Game1 : Game
             System.Console.WriteLine("Tileset not found — using rectangle fallback.");
         }
 
-        // Load OpenRPG tilesets
-        _tsSheets = new Texture2D[5];
+        // Load tilesets
+        _tsSheets = new Texture2D[_tsNames.Length];
         for (int i = 0; i < _tsNames.Length; i++)
         {
-            string tsPath = System.IO.Path.Combine(Content.RootDirectory, "openRPG_Tilesets_5", _tsNames[i] + ".png");
+            string tsPath = System.IO.Path.Combine(Content.RootDirectory, _tsPaths[i] + ".png");
             if (System.IO.File.Exists(tsPath))
             {
                 using var tsStream = System.IO.File.OpenRead(tsPath);
@@ -25604,7 +25605,7 @@ public class Game1 : Game
         
         // Tab cycles through sheets
         if (kb.IsKeyDown(Keys.Tab) && !_prevKb.IsKeyDown(Keys.Tab))
-            _trSheetIdx = (_trSheetIdx + 1) % 5;
+            _trSheetIdx = (_trSheetIdx + 1) % _tsSheets.Length;
         
         // +/- to adjust scale
         if (kb.IsKeyDown(Keys.OemPlus) && !_prevKb.IsKeyDown(Keys.OemPlus) && _trScale < 8)
@@ -25698,7 +25699,7 @@ public class Game1 : Game
         
         // Tab cycles palette sheet
         if (kb.IsKeyDown(Keys.Tab) && !_prevKb.IsKeyDown(Keys.Tab))
-            _trSheetIdx = (_trSheetIdx + 1) % 5;
+            _trSheetIdx = (_trSheetIdx + 1) % _tsSheets.Length;
         
         // Scroll palette with mouse wheel
         int scrollDelta = mouse.ScrollWheelValue - _prevMouse.ScrollWheelValue;
@@ -25833,14 +25834,15 @@ public class Game1 : Game
                 int y1 = Math.Min(_trCollDragStart.Y, cmy);
                 int x2 = Math.Max(_trCollDragStart.X, cmx);
                 int y2 = Math.Max(_trCollDragStart.Y, cmy);
-                // Snap to tile grid
-                x1 = (x1 / TSDst) * TSDst;
-                y1 = (y1 / TSDst) * TSDst;
-                x2 = ((x2 + TSDst - 1) / TSDst) * TSDst;
-                y2 = ((y2 + TSDst - 1) / TSDst) * TSDst;
+                // Snap to grid — hold Shift for half-tile (24px), otherwise full tile (48px)
+                int snap = kb.IsKeyDown(Keys.LeftShift) || kb.IsKeyDown(Keys.RightShift) ? TSDst / 2 : TSDst;
+                x1 = (x1 / snap) * snap;
+                y1 = (y1 / snap) * snap;
+                x2 = ((x2 + snap - 1) / snap) * snap;
+                y2 = ((y2 + snap - 1) / snap) * snap;
                 int w = x2 - x1;
                 int h = y2 - y1;
-                if (w >= TSDst && h >= TSDst)
+                if (w >= snap && h >= snap)
                 {
                     // Hold arrow key while releasing to set ledge direction
                     // Arrow = direction player CAN HOP THROUGH (↓ = can jump down off ledge)
@@ -26247,7 +26249,7 @@ public class Game1 : Game
         DrawRect(0, 0, ScreenW, 50, new Color(15, 15, 20, 230));
         string layerStr = _trCollisionMode ? "COLLISION" : (_trActiveLayer == 0 ? "BG" : "FG");
         string viewStr = _trLayerView == 0 ? "" : _trLayerView == 1 ? " [BG ONLY]" : " [FG ONLY]";
-        string selStr = _trCollisionMode ? "Click+drag=add, Right-click=delete" : (_trSelectedTile >= 0 ? $"{_tsNames[_trSelectedSheet]}#{_trSelectedTile}" : "ERASER");
+        string selStr = _trCollisionMode ? "Drag=add, RClick=del, Shift=half-tile, Arrows=ledge" : (_trSelectedTile >= 0 ? $"{_tsNames[_trSelectedSheet]}#{_trSelectedTile}" : "ERASER");
         string roomLabel = _trPaintRoom == 50 ? "5b (Cave)" : _trPaintRoom.ToString();
         string header = $"PAINT — Room {roomLabel} ({roomCols}×{roomRows})  |  Mode: {layerStr}{viewStr}  |  {selStr}";
         Color headerColor = _trCollisionMode ? new Color(255, 100, 100) : new Color(200, 170, 100);
