@@ -10936,6 +10936,7 @@ public class Game1 : Game
         _torches.Add(new Vector2(ax + aw / 2, ay + 60));
         _torches.Add(new Vector2(ax + 120, ay + ah - 60));
         _torches.Add(new Vector2(ax + aw - 120, ay + ah - 60));
+        AddTorchesFromTiles(5);
     }
     
     private void TriggerRoomCleared(string roomName = null)
