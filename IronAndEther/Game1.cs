@@ -851,7 +851,9 @@ public class Game1 : Game
     private float _walkAnimTimer = 0f;
     private int _walkFrame = 0; // 0,1,2 walk cycle
     private int _facingDir = 0; // 0=down, 1=left, 2=right, 3=up
-    private bool _showHitboxes = false; // F1 debug toggle
+    private bool _showHitboxes = false; // H debug toggle (test mode)
+    private bool _pushingWall = false; // player is pressing against a solid wall
+    private float _pushTimer = 0f;
     private bool _hasSword = false;
     private float _swordTimer;         // counts down during swing
     private float _swordCooldown;      // cooldown between swings
@@ -1838,7 +1840,7 @@ public class Game1 : Game
             _inventoryOpen = !_inventoryOpen;
             if (!_inventoryOpen) DropOverflowToGround();
         }
-        if (kb.IsKeyDown(Keys.F1) && !_prevKb.IsKeyDown(Keys.F1))
+        if (_testMode && kb.IsKeyDown(Keys.H) && !_prevKb.IsKeyDown(Keys.H))
             _showHitboxes = !_showHitboxes;
         
         // Always track mouse for inventory hover
@@ -2933,6 +2935,17 @@ public class Game1 : Game
             else
             {
                 _walkFrame = 1; // idle = middle frame (standing)
+                _pushTimer = 0f;
+            }
+            // Override walk anim when pushing against a wall
+            if (_pushingWall && move.LengthSquared() > 0)
+            {
+                _pushTimer += dt;
+                _walkFrame = 1; // freeze on standing frame (push pose)
+            }
+            else
+            {
+                _pushTimer = 0f;
             }
         }
         
@@ -3021,6 +3034,7 @@ public class Game1 : Game
         }
         
         // Wall collision (push player out of walls) — skip when inside cave or ledge hopping
+        _pushingWall = false;
         if (!_inCave && !_ledgeHopping && _screenWalls.TryGetValue(_currentScreen, out var walls))
         {
             var playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2), (int)PlayerSize, (int)PlayerSize);
@@ -3096,6 +3110,7 @@ public class Game1 : Game
                     continue;
                 }
                 
+                _pushingWall = true;
                 if (minPush == pushLeft) _playerPos.X -= pushLeft;
                 else if (minPush == pushRight) _playerPos.X += pushRight;
                 else if (minPush == pushUp) _playerPos.Y -= pushUp;
@@ -27190,7 +27205,7 @@ public class Game1 : Game
             }
             DrawTextOutlined(px, py, "1/2/3: Cycle  SPACE: Shield Bash", new Color(100, 100, 100), Color.Black * 0.4f);
             py += 14;
-            DrawTextOutlined(px, py, "LMB: Shoot  T: Exit test", new Color(100, 100, 100), Color.Black * 0.4f);
+            DrawTextOutlined(px, py, "LMB: Shoot  T: Exit test  H: Hitboxes" + (_showHitboxes ? " [ON]" : ""), new Color(100, 100, 100), Color.Black * 0.4f);
             py += 18;
             DrawTextFallback(px, py, $"Bloom: {_bloomIntensity:F2} [Y/U]  Vignette: {_vignetteStrength:F2} [I/O]", Color.Yellow, 0.6f);
             py += 14;
