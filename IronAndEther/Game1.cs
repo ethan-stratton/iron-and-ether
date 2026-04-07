@@ -3046,12 +3046,12 @@ public class Game1 : Game
                 // Player is blocked normally; holding into the wall triggers a ledge hop
                 if (ow > 0 && !_ledgeHopping)
                 {
-                    // Check if player is pushing in the passable direction
+                    // Check if player is holding movement in the hop direction
                     bool pushing = false;
-                    if (ow == 1 && minPush == pushDown && kb.IsKeyDown(Keys.W)) pushing = true; // push up into wall that lets you hop up
-                    if (ow == 2 && minPush == pushUp && kb.IsKeyDown(Keys.S)) pushing = true;
-                    if (ow == 3 && minPush == pushRight && kb.IsKeyDown(Keys.A)) pushing = true;
-                    if (ow == 4 && minPush == pushLeft && kb.IsKeyDown(Keys.D)) pushing = true;
+                    if (ow == 1 && kb.IsKeyDown(Keys.W)) pushing = true; // hop up
+                    if (ow == 2 && kb.IsKeyDown(Keys.S)) pushing = true; // hop down
+                    if (ow == 3 && kb.IsKeyDown(Keys.A)) pushing = true; // hop left
+                    if (ow == 4 && kb.IsKeyDown(Keys.D)) pushing = true; // hop right
                     
                     if (pushing && _ledgeHoldDir == ow)
                     {
