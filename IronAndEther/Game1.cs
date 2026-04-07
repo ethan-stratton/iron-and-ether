@@ -20671,14 +20671,14 @@ public class Game1 : Game
     private int InvEssItemsY => InvEssLabelY + InvLabelH;
     
     // Secondary loadout section (below primary, extra gap)
-    private int InvSecHeaderY => InvEssItemsY + 40;
-    private int InvSecComboY => InvSecHeaderY + 24;
-    private int InvSecFormLabelY => InvSecComboY + 24;
+    private int InvSecHeaderY => InvEssItemsY + 55;
+    private int InvSecFormLabelY => InvSecHeaderY + 24;
     private int InvSecFormY => InvSecFormLabelY + 18;
     private int InvSecBehLabelY => InvSecFormY + 24;
     private int InvSecBehY => InvSecBehLabelY + 18;
     private int InvSecEssLabelY => InvSecBehY + 24;
     private int InvSecEssY => InvSecEssLabelY + 18;
+    private int InvSecComboY => InvSecEssY + 24;
     
     // Utility essence section
     private int InvUtilLabelY => InvSecEssY + 30;
@@ -21800,7 +21800,7 @@ public class Game1 : Game
         {
             float qAlpha = MathHelper.Clamp(_questionMarkTimer / 0.3f, 0f, 1f);
             float qBob = MathF.Sin(_questionMarkTimer * 8f) * 2f;
-            DrawTextFallback((int)_playerPos.X - 3, (int)_playerPos.Y - 20 + (int)qBob, "?", Color.Yellow * qAlpha);
+            DrawTextFallback((int)_playerPos.X - 3, (int)(_playerPos.Y - _jumpHeight) - 20 + (int)qBob, "?", Color.Yellow * qAlpha);
         }
 
         // Undine familiar
@@ -26642,7 +26642,7 @@ public class Game1 : Game
         float swapT = _loadoutSwapTimer > 0 ? 1f - (_loadoutSwapTimer / LoadoutSwapDuration) : 1f;
         float smoothSwap = swapT * swapT * (3f - 2f * swapT); // smoothstep
         
-        int cardX = 20, cardW = 320, cardH = 36;
+        int cardX = 20, cardW = 360, cardH = 36;
         int peekX = 6, peekY = 10;
         
         float activeY = hudY;
@@ -26667,11 +26667,14 @@ public class Game1 : Game
         Color activeAccent = _loadoutIsPrimary ? new Color(255, 200, 100) : new Color(100, 200, 255);
         Color inactiveAccent = _loadoutIsPrimary ? new Color(100, 200, 255) : new Color(255, 200, 100);
         
-        // INACTIVE card (behind) — peeking out
+        // INACTIVE card (behind) — peeking out (only if it has content)
         float dimA = 0.45f;
-        DrawRect(cardX + peekX, (int)inactiveY, cardW, cardH, new Color(18, 18, 25));
-        DrawRect(cardX + peekX, (int)inactiveY, cardW, 2, inactiveAccent * dimA);
-        DrawTextFallback(cardX + peekX + 8, (int)inactiveY + 12, inactiveComboName, Color.Gray * dimA);
+        if (inactiveLo.FilledSlots > 0)
+        {
+            DrawRect(cardX + peekX, (int)inactiveY, cardW, cardH, new Color(18, 18, 25));
+            DrawRect(cardX + peekX, (int)inactiveY, cardW, 2, inactiveAccent * dimA);
+            DrawTextFallback(cardX + peekX + 8, (int)inactiveY + 12, inactiveComboName, Color.Gray * dimA);
+        }
         
         // ACTIVE card (top)
         DrawRect(cardX, (int)activeY, cardW, cardH, new Color(25, 25, 35));
@@ -27184,10 +27187,6 @@ public class Game1 : Game
                 // ═══ SECONDARY LOADOUT (Q-swap) ═══
                 DrawTextFallback(cx, InvSecHeaderY, "SECONDARY LOADOUT [Q]", new Color(100, 200, 255) * alpha, 1.1f);
                 
-                // Secondary combo name
-                string secComboName = _loadoutSecondary.ComboName;
-                DrawTextFallback(cx + InvItemIndent, InvSecComboY, secComboName, textCol);
-                
                 // Secondary Form
                 DrawTextFallback(cx, InvSecFormLabelY, "FORM", new Color(200, 80, 80) * alpha);
                 string secFormVal = _loadoutSecondary.Form == Form.None ? "---" : _loadoutSecondary.FormName;
@@ -27237,6 +27236,13 @@ public class Game1 : Game
                     Color ec = active ? new Color(100, 200, 255) * alpha : (hover ? Color.White * alpha : dimCol);
                     DrawTextFallback(fx, InvSecEssY, en, ec);
                     fx += tw + InvItemGap;
+                }
+                
+                // Secondary combo name (only if at least one slot filled)
+                if (_loadoutSecondary.FilledSlots > 0)
+                {
+                    string secComboName = _loadoutSecondary.ComboName;
+                    DrawTextFallback(cx + InvItemIndent, InvSecComboY, secComboName, textCol);
                 }
                 
                 // ═══ UTILITY ESSENCE [E] ═══
