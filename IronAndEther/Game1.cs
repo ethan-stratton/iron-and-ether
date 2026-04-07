@@ -736,6 +736,9 @@ public class Game1 : Game
     private bool _loadoutIsPrimary = true; // true = _loadout is primary, false = secondary is active
     private float _loadoutSwapTimer = 0f; // visual swap animation
     private const float LoadoutSwapDuration = 0.3f;
+    private float _utilityCooldown = 0f;
+    private const float UtilityCooldownTime = 0.5f;
+    private float _utilityFlashTimer = 0f; // visual feedback
     private float _fireTimer;
 
     private List<Projectile> _projectiles = new();
@@ -880,6 +883,8 @@ public class Game1 : Game
     private bool _ownsLambentAura = false;
     private bool _ownsEtherRegen = false;
     private bool _hasEtherRegenRelic = false; // active toggle for relic
+    private bool _ownsQuickswap = true; // Secondary loadout relic — auto-enabled for dev
+    private bool _hasQuickswap = true;
     
     // TAB menu dropdown state
     private bool _relicsExpanded = true;
@@ -2577,8 +2582,8 @@ public class Game1 : Game
             }
         }
 
-        // Loadout swap — Q key
-        if (kb.IsKeyDown(Keys.Q) && !_prevKb.IsKeyDown(Keys.Q))
+        // Loadout swap — Q key (requires Quickswap relic)
+        if (_hasQuickswap && kb.IsKeyDown(Keys.Q) && !_prevKb.IsKeyDown(Keys.Q))
         {
             (_loadout, _loadoutSecondary) = (_loadoutSecondary, _loadout);
             _loadoutIsPrimary = !_loadoutIsPrimary;
@@ -2658,6 +2663,38 @@ public class Game1 : Game
                 _finisherZoom = 1f;
                 _finisherKillProcessed = false;
                 break;
+            }
+        }
+
+        // Utility essence — E key when no finisher/NPC interaction triggered
+        if (_utilityCooldown > 0) _utilityCooldown -= dt;
+        if (_utilityFlashTimer > 0) _utilityFlashTimer -= dt;
+        if (kb.IsKeyDown(Keys.E) && !_prevKb.IsKeyDown(Keys.E) && !_finisherActive 
+            && _utilityEssence != Essence.None && _utilityCooldown <= 0)
+        {
+            // Check if near an NPC first — if so, NPC code handles it downstream
+            bool nearNpc = false;
+            foreach (var npc in _npcs)
+                if (Vector2.Distance(_playerPos, npc.Position) < npc.InteractRadius) { nearNpc = true; break; }
+            
+            if (!nearNpc)
+            {
+                _utilityCooldown = UtilityCooldownTime;
+                _utilityFlashTimer = 0.4f;
+                // Burst particles in essence color
+                Color utilCol = GetEssenceColor(_utilityEssence);
+                for (int up = 0; up < 16; up++)
+                {
+                    float a = (float)_rng.NextDouble() * MathF.PI * 2f;
+                    float spd = 60f + (float)_rng.NextDouble() * 80f;
+                    _particles.Add(new Particle {
+                        Position = _playerPos,
+                        Velocity = new Vector2(MathF.Cos(a) * spd, MathF.Sin(a) * spd),
+                        Life = 0.5f, MaxLife = 0.5f,
+                        Color = utilCol, Size = 3f
+                    });
+                }
+                // TODO: Step 4 — check nearby interactables for matching essence
             }
         }
 
@@ -10494,7 +10531,7 @@ public class Game1 : Game
         // Relic toggling by clicking (test mode)
         if (_testMode && mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
         {
-            int relicX = 960; // matches hpBarX in DrawHUD
+            int relicX = 1010; // matches hpBarX in DrawHUD
             int relicY = 8 + 14 + 32; // hpBarY(8) + etherOffset(14) + relicOffset(32) = 54
             for (int i = 0; i < 7; i++)
             {
@@ -20632,14 +20669,14 @@ public class Game1 : Game
     private int InvEssLabelY => InvBehItemsY + InvRowGap;
     private int InvEssItemsY => InvEssLabelY + InvLabelH;
     
-    // Secondary loadout section (below primary)
-    private int InvSecHeaderY => InvEssItemsY + InvRowGap + 10;
-    private int InvSecFormY => InvSecHeaderY + InvLabelH;
+    // Secondary loadout section (below primary, extra gap)
+    private int InvSecHeaderY => InvEssItemsY + InvRowGap + 20;
+    private int InvSecFormY => InvSecHeaderY + InvLabelH + 4;
     private int InvSecBehY => InvSecFormY + InvRowGap;
     private int InvSecEssY => InvSecBehY + InvRowGap;
     
     // Utility essence section
-    private int InvUtilLabelY => InvSecEssY + InvRowGap + 10;
+    private int InvUtilLabelY => InvSecEssY + InvRowGap + 16;
     private int InvUtilItemsY => InvUtilLabelY + InvLabelH;
 
     private void RefreshCombo()
@@ -26594,13 +26631,13 @@ public class Game1 : Game
 
     private void DrawHUD()
     {
-        int hudY = 10;
+        int hudY = 14;
         
         // ═══ LOADOUT CARDS — combo title cards that flip on Q swap ═══
         float swapT = _loadoutSwapTimer > 0 ? 1f - (_loadoutSwapTimer / LoadoutSwapDuration) : 1f;
         float smoothSwap = swapT * swapT * (3f - 2f * swapT); // smoothstep
         
-        int cardX = 10, cardW = 280, cardH = 36;
+        int cardX = 20, cardW = 320, cardH = 36;
         int peekX = 6, peekY = 10;
         
         float activeY = hudY;
@@ -26636,16 +26673,24 @@ public class Game1 : Game
         DrawRect(cardX, (int)activeY, cardW, 2, activeAccent);
         DrawTextFallback(cardX + 8, (int)activeY + 4, "Q", activeAccent * 0.5f, 0.7f);
         DrawTextFallback(cardX + 22, (int)activeY + 4, activeComboName, Color.White, 1.1f);
-        // Essence color dot
-        DrawRect(cardX + cardW - 16, (int)activeY + 12, 10, 10, activeEssCol);
+        // Essence color dot — outside card to the right
+        DrawRect(cardX + cardW + 6, (int)activeY + 10, 14, 14, activeEssCol);
+        DrawRect(cardX + cardW + 7, (int)activeY + 11, 12, 12, activeEssCol * 0.6f);
         
         var parms = activeParms;
         var essenceColor = activeEssCol;
         
-        // Utility essence (right side of screen)
+        // Utility essence — right of combo card + dot
         string utilName = _utilityEssence == Essence.None ? "---" : _utilityEssence.ToString();
         Color utilColor = _utilityEssence == Essence.None ? Color.Gray : GetEssenceColor(_utilityEssence);
-        DrawSlotBox(ScreenW - 170, hudY, "E:UTILITY", utilName, utilColor);
+        int utilX = cardX + cardW + 30;
+        DrawRect(utilX, hudY, 100, cardH, new Color(20, 25, 20));
+        DrawRect(utilX, hudY, 100, 2, new Color(60, 220, 160) * 0.6f);
+        DrawTextFallback(utilX + 4, hudY + 4, "E", new Color(60, 220, 160) * 0.5f, 0.7f);
+        DrawTextFallback(utilX + 16, hudY + 4, utilName, utilColor);
+        // Utility flash on use
+        if (_utilityFlashTimer > 0)
+            DrawRect(utilX, hudY, 100, cardH, utilColor * (_utilityFlashTimer / 0.4f * 0.3f));
         
         // Stats line below active card
         string statsLine = $"DMG:{parms.BaseDamage:F0}  SPD:{parms.Speed:F0}  FR:{parms.FireRate:F2}s";
@@ -26726,12 +26771,12 @@ public class Game1 : Game
         }
         
         // HP bar — top right of HUD
-        int hpBarX = 950;
+        int hpBarX = 1010;
         int hpBarY = 8;
-        int hpBarW = 240;
+        int hpBarW = 200;
         DrawRect(hpBarX, hpBarY, hpBarW, 10, new Color(60, 20, 20));
         DrawRect(hpBarX, hpBarY, (int)(hpBarW * (_playerHp / PlayerMaxHp)), 10, new Color(200, 50, 50));
-        DrawTextFallback(hpBarX - 55, hpBarY - 1, $"HP {_playerHp:F0}", Color.White);
+        DrawTextFallback(hpBarX - 60, hpBarY - 1, $"HP {_playerHp:F0}", Color.White);
         
         // Mana bar — below HP bar (juiced)
         int etherBarY = hpBarY + 14;
@@ -26784,7 +26829,7 @@ public class Game1 : Game
         
         // Label
         Color epLabelCol = etherLow ? Color.Lerp(new Color(100, 150, 255), new Color(255, 80, 80), 0.5f + etherPulse) : new Color(100, 150, 255);
-        DrawTextFallback(hpBarX - 55, etherBarY - 1, $"EP {_playerEther:F0}", epLabelCol);
+        DrawTextFallback(hpBarX - 60, etherBarY - 1, $"EP {_playerEther:F0}", epLabelCol);
         
         // Ether shard counter — below mana bar
         DrawTextFallback(hpBarX, etherBarY + 14, $"Ether Crystals: {_hardEther}", new Color(200, 180, 255));
