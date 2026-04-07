@@ -20671,8 +20671,9 @@ public class Game1 : Game
     private int InvEssItemsY => InvEssLabelY + InvLabelH;
     
     // Secondary loadout section (below primary, extra gap)
-    private int InvSecHeaderY => InvEssItemsY + 30;
-    private int InvSecFormLabelY => InvSecHeaderY + 24;
+    private int InvSecHeaderY => InvEssItemsY + 40;
+    private int InvSecComboY => InvSecHeaderY + 24;
+    private int InvSecFormLabelY => InvSecComboY + 24;
     private int InvSecFormY => InvSecFormLabelY + 18;
     private int InvSecBehLabelY => InvSecFormY + 24;
     private int InvSecBehY => InvSecBehLabelY + 18;
@@ -26780,7 +26781,7 @@ public class Game1 : Game
         int hpBarW = 200;
         DrawRect(hpBarX, hpBarY, hpBarW, 10, new Color(60, 20, 20));
         DrawRect(hpBarX, hpBarY, (int)(hpBarW * (_playerHp / PlayerMaxHp)), 10, new Color(200, 50, 50));
-        DrawTextFallback(hpBarX - 75, hpBarY - 1, $"HP {_playerHp:F0}", Color.White);
+        DrawTextFallback(hpBarX - 83, hpBarY - 1, $"HP {_playerHp:F0}", Color.White);
         
         // Mana bar — below HP bar (juiced)
         int etherBarY = hpBarY + 14;
@@ -26833,7 +26834,7 @@ public class Game1 : Game
         
         // Label
         Color epLabelCol = etherLow ? Color.Lerp(new Color(100, 150, 255), new Color(255, 80, 80), 0.5f + etherPulse) : new Color(100, 150, 255);
-        DrawTextFallback(hpBarX - 75, etherBarY - 1, $"EP {_playerEther:F0}", epLabelCol);
+        DrawTextFallback(hpBarX - 83, etherBarY - 1, $"EP {_playerEther:F0}", epLabelCol);
         
         // Ether shard counter — below mana bar
         DrawTextFallback(hpBarX, etherBarY + 14, $"Ether Crystals: {_hardEther}", new Color(200, 180, 255));
@@ -27183,8 +27184,14 @@ public class Game1 : Game
                 // ═══ SECONDARY LOADOUT (Q-swap) ═══
                 DrawTextFallback(cx, InvSecHeaderY, "SECONDARY LOADOUT [Q]", new Color(100, 200, 255) * alpha, 1.1f);
                 
+                // Secondary combo name
+                string secComboName = _loadoutSecondary.ComboName;
+                DrawTextFallback(cx + InvItemIndent, InvSecComboY, secComboName, textCol);
+                
                 // Secondary Form
-                DrawTextFallback(cx, InvSecFormLabelY, "FORM", new Color(200, 80, 80) * alpha * 0.7f);
+                DrawTextFallback(cx, InvSecFormLabelY, "FORM", new Color(200, 80, 80) * alpha);
+                string secFormVal = _loadoutSecondary.Form == Form.None ? "---" : _loadoutSecondary.FormName;
+                DrawTextFallback(cx + 120, InvSecFormLabelY, secFormVal, textCol);
                 fx = cx + InvItemIndent;
                 foreach (var f in _unlockedForms)
                 {
@@ -27199,7 +27206,9 @@ public class Game1 : Game
                 }
                 
                 // Secondary Behavior
-                DrawTextFallback(cx, InvSecBehLabelY, "BEHAVIOR", new Color(80, 200, 80) * alpha * 0.7f);
+                DrawTextFallback(cx, InvSecBehLabelY, "BEHAVIOR", new Color(80, 200, 80) * alpha);
+                string secBehVal = _loadoutSecondary.Behavior == Behavior.None ? "---" : _loadoutSecondary.BehaviorName;
+                DrawTextFallback(cx + 120, InvSecBehLabelY, secBehVal, textCol);
                 fx = cx + InvItemIndent;
                 foreach (var b in _unlockedBehaviors)
                 {
@@ -27214,7 +27223,9 @@ public class Game1 : Game
                 }
                 
                 // Secondary Essence
-                DrawTextFallback(cx, InvSecEssLabelY, "ESSENCE", essCol * 0.7f);
+                DrawTextFallback(cx, InvSecEssLabelY, "ESSENCE", essCol);
+                string secEssVal = _loadoutSecondary.Essence == Essence.None ? "---" : _loadoutSecondary.EssenceName;
+                DrawTextFallback(cx + 120, InvSecEssLabelY, secEssVal, textCol);
                 fx = cx + InvItemIndent;
                 foreach (var e in _unlockedEssences)
                 {
