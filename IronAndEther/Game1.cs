@@ -21800,7 +21800,7 @@ public class Game1 : Game
         {
             float qAlpha = MathHelper.Clamp(_questionMarkTimer / 0.3f, 0f, 1f);
             float qBob = MathF.Sin(_questionMarkTimer * 8f) * 2f;
-            DrawTextFallback((int)_playerPos.X - 3, (int)(_playerPos.Y - _jumpHeight) - 20 + (int)qBob, "?", Color.Yellow * qAlpha);
+            DrawTextFallback((int)_playerPos.X - 3, (int)(_playerPos.Y - _jumpHeight) - 30 + (int)qBob, "?", Color.Yellow * qAlpha);
         }
 
         // Undine familiar
