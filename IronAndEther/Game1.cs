@@ -2759,7 +2759,7 @@ public class Game1 : Game
         
         // Clamp to screen edges (tiles cover full screen)
         _playerPos.X = MathHelper.Clamp(_playerPos.X, PlayerSize, ScreenW - PlayerSize);
-        _playerPos.Y = MathHelper.Clamp(_playerPos.Y, PlayerSize, ScreenH - PlayerSize);
+        _playerPos.Y = MathHelper.Clamp(_playerPos.Y, PlayerSize + TSDst, ScreenH - PlayerSize);
         
         // Scrolling camera — smooth follow for rooms larger than screen
         if (_arena.Height > ScreenH - 60) // room taller than screen
@@ -2914,7 +2914,7 @@ public class Game1 : Game
             // Use screen edges for transitions (tiles cover full screen)
             float transL = PlayerSize;           // left screen edge + margin
             float transR = ScreenW - PlayerSize; // right screen edge - margin
-            float transT = PlayerSize;           // top screen edge + margin
+            float transT = PlayerSize + TSDst;    // top: 1 tile down from screen edge (avoid HUD)
             float transB = ScreenH - PlayerSize; // bottom screen edge - margin
             
             // Block screen transitions while inside Room 3 portal
@@ -3206,7 +3206,7 @@ public class Game1 : Game
 
 
         _playerPos.X = MathHelper.Clamp(_playerPos.X, PlayerSize / 2, ScreenW - PlayerSize / 2);
-        _playerPos.Y = MathHelper.Clamp(_playerPos.Y, PlayerSize / 2, ScreenH - PlayerSize / 2);
+        _playerPos.Y = MathHelper.Clamp(_playerPos.Y, PlayerSize / 2 + TSDst, ScreenH - PlayerSize / 2);
 
         // Undine familiar update
         UpdateUndine(dt);
