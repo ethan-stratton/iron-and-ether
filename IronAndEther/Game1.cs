@@ -16019,6 +16019,10 @@ public class Game1 : Game
                 if (_caveTransitionIn)
                 {
                     _inCave = true;
+                    _torches.Clear(); // hide overworld torches in cave
+                    // Add cave interior light (dim, centered)
+                    _torches.Add(new Vector2(ScreenW / 2f, ScreenH / 2f));
+                    AddTorchesFromTiles(50); // scan cave tile data for lights
                     _playerPos = new Vector2(_caveExit.Center.X, _caveExit.Center.Y - 40);
                 }
                 else
@@ -16117,6 +16121,7 @@ public class Game1 : Game
             {
                 // Immediately switch to overworld, then play grow animation from cave entrance
                 _inCave = false;
+                AddTorchesFromTiles(5); // restore overworld torches
                 _playerPos = _caveReturnPos;
                 _caveTransStartPos = new Vector2(_caveEntrance.Center.X, _caveEntrance.Center.Y);
                 _caveTransitionIn = false;
