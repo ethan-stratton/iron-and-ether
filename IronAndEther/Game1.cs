@@ -231,7 +231,7 @@ public class Game1 : Game
     private bool _isJumping = false;
     private float _jumpVelocity = 0f;
     private float _jumpHeight = 0f; // current visual offset (positive = higher)
-    private const float JumpStrength = 280f;
+    private const float JumpStrength = 140f;
     private const float JumpGravity = 700f;
     // Ledge hop (ALttP one-way wall)
     private bool _ledgeHopping = false;
@@ -845,6 +845,12 @@ public class Game1 : Game
 
     // Sword
     private Texture2D _swordTex; // Exotic Swords sprite sheet
+    private Texture2D _playerTex; // Knight sprite sheet
+    private const int KF_W = 26, KF_H = 36; // knight frame size
+    private const int KF_COL = 6; // 3rd knight starts at column 6 (0-indexed)
+    private float _walkAnimTimer = 0f;
+    private int _walkFrame = 0; // 0,1,2 walk cycle
+    private int _facingDir = 0; // 0=down, 1=left, 2=right, 3=up
     private bool _hasSword = false;
     private float _swordTimer;         // counts down during swing
     private float _swordCooldown;      // cooldown between swings
@@ -1504,7 +1510,16 @@ public class Game1 : Game
         }
         else
         {
-            System.Console.WriteLine("Tileset not found — using rectangle fallback.");
+            System.Console.WriteLine("Sword sheet not found.");
+        }
+        
+        // Load knight sprite sheet
+        string knightPath = System.IO.Path.Combine(Content.RootDirectory, "knights_1x.png");
+        if (System.IO.File.Exists(knightPath))
+        {
+            using var knightStream = System.IO.File.OpenRead(knightPath);
+            _playerTex = Texture2D.FromStream(GraphicsDevice, knightStream);
+            System.Console.WriteLine($"Knight sheet loaded: {_playerTex.Width}x{_playerTex.Height}");
         }
 
         // Load tilesets
@@ -2900,6 +2915,20 @@ public class Game1 : Game
                 move.Normalize();
                 if (_wailDebuffTimer > 0) move = -move; // inverted movement
                 _playerPos += move * PlayerSpeed * (_webSlowTimer > 0 ? 0.4f : 1f) * dt;
+                
+                // Walk animation + facing direction
+                _walkAnimTimer += dt * 6f; // 6 frames/sec walk cycle
+                if (_walkAnimTimer >= 3f) _walkAnimTimer -= 3f;
+                _walkFrame = (int)_walkAnimTimer;
+                // Determine facing from movement direction
+                if (MathF.Abs(move.X) > MathF.Abs(move.Y))
+                    _facingDir = move.X < 0 ? 1 : 2; // left or right
+                else
+                    _facingDir = move.Y < 0 ? 3 : 0; // up or down
+            }
+            else
+            {
+                _walkFrame = 1; // idle = middle frame (standing)
             }
         }
         
@@ -26424,21 +26453,40 @@ public class Game1 : Game
         
         Color blk = Color.Black;
         
-        // Simple rect player — shows exact collision size
-        int pw = (int)PlayerSize;
-        int ph = (int)PlayerSize;
-        int px = (int)(pos.X - pw / 2);
-        int py = (int)(pos.Y - ph / 2 - jumpHeight);
-        DrawRect(px, py, pw, ph, tint);
-        DrawRect(px, py, pw, 1, blk);
-        DrawRect(px, py + ph - 1, pw, 1, blk);
-        DrawRect(px, py, 1, ph, blk);
-        DrawRect(px + pw - 1, py, 1, ph, blk);
-        // Eyes (show facing direction)
-        int eyeX = aimDir.X >= 0 ? px + pw - 6 : px + 3;
-        int eyeY = py + 4;
-        DrawRect(eyeX, eyeY, 3, 3, Color.White);
-        DrawRect(eyeX + (aimDir.X >= 0 ? 1 : 0), eyeY + 1, 1, 1, blk);
+        // Sprite-based player
+        if (_playerTex != null)
+        {
+            int srcX = (KF_COL + _walkFrame) * KF_W;
+            int srcY = _facingDir * KF_H;
+            var srcRect = new Rectangle(srcX, srcY, KF_W, KF_H);
+            float scale = 2.5f; // 26×36 → 65×90 display
+            var origin = new Vector2(KF_W / 2f, KF_H - 4f); // anchor at feet
+            var drawPos = new Vector2(pos.X, pos.Y + PlayerSize / 2f);
+            
+            // Hit flash
+            Color spriteTint = tint;
+            
+            _spriteBatch.Draw(_playerTex, drawPos, srcRect, spriteTint,
+                0f, origin, scale, Microsoft.Xna.Framework.Graphics.SpriteEffects.None, 0f);
+        }
+        else
+        {
+            // Fallback rect player
+            int pw = (int)PlayerSize;
+            int ph = (int)PlayerSize;
+            int px = (int)(pos.X - pw / 2);
+            int py = (int)(pos.Y - ph / 2);
+            DrawRect(px, py, pw, ph, tint);
+            DrawRect(px, py, pw, 1, blk);
+            DrawRect(px, py + ph - 1, pw, 1, blk);
+            DrawRect(px, py, 1, ph, blk);
+            DrawRect(px + pw - 1, py, 1, ph, blk);
+            // Eyes (show facing direction)
+            int eyeX = aimDir.X >= 0 ? px + pw - 6 : px + 3;
+            int eyeY = py + 4;
+            DrawRect(eyeX, eyeY, 3, 3, Color.White);
+            DrawRect(eyeX + (aimDir.X >= 0 ? 1 : 0), eyeY + 1, 1, 1, blk);
+        }
         
         // Sword swing arc (sprite-based)
         if (_hasSword && _swordTimer > 0 && _swordTex != null)
