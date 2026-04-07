@@ -232,6 +232,15 @@ public class Game1 : Game
     private float _jumpHeight = 0f; // current visual offset (positive = higher)
     private const float JumpStrength = 280f;
     private const float JumpGravity = 700f;
+    // Ledge hop (ALttP one-way wall)
+    private bool _ledgeHopping = false;
+    private float _ledgeHopTimer = 0f;
+    private Vector2 _ledgeHopTarget;
+    private Vector2 _ledgeHopStart;
+    private const float LedgeHopDuration = 0.35f; // time to complete hop
+    private const float LedgeHopHoldTime = 0.15f; // hold time before hop triggers
+    private float _ledgeHoldTimer = 0f; // how long player has been pushing into one-way wall
+    private int _ledgeHoldDir = 0; // which one-way direction is being held into
     private float _inventorySlide = 0f; // 0=closed, 1=fully open
     private const float InventorySlideSpeed = 6f;
     private int _pauseSelection = 0;
@@ -2738,10 +2747,13 @@ public class Game1 : Game
         else
         {
             Vector2 move = Vector2.Zero;
+            if (!_ledgeHopping)
+            {
             if (kb.IsKeyDown(Keys.W)) move.Y -= 1;
             if (kb.IsKeyDown(Keys.S)) move.Y += 1;
             if (kb.IsKeyDown(Keys.A)) move.X -= 1;
             if (kb.IsKeyDown(Keys.D)) move.X += 1;
+            }
             // Wail debuff timer (always ticks, even when not moving)
             if (_wailDebuffTimer > 0) _wailDebuffTimer -= dt;
             if (_webSlowTimer > 0) _webSlowTimer -= dt;
@@ -2832,8 +2844,37 @@ public class Game1 : Game
             }
         }
         
-        // Wall collision (push player out of walls) — skip when inside cave
-        if (!_inCave && _screenWalls.TryGetValue(_currentScreen, out var walls))
+        // Ledge hop update (ALttP style)
+        if (_ledgeHopping)
+        {
+            _ledgeHopTimer += dt;
+            float t2 = MathHelper.Clamp(_ledgeHopTimer / LedgeHopDuration, 0f, 1f);
+            // Smooth movement
+            float smoothT = t2 * t2 * (3f - 2f * t2); // smoothstep
+            _playerPos = Vector2.Lerp(_ledgeHopStart, _ledgeHopTarget, smoothT);
+            // Visual jump arc (shadow stays, player hops up then down)
+            _jumpHeight = MathF.Sin(t2 * MathF.PI) * 30f; // 30px peak
+            _isJumping = true; // suppress normal jump
+            if (t2 >= 1f)
+            {
+                _ledgeHopping = false;
+                _jumpHeight = 0f;
+                _isJumping = false;
+                // Landing dust
+                for (int d2 = 0; d2 < 6; d2++)
+                {
+                    float a2 = (float)_rng.NextDouble() * MathF.PI * 2f;
+                    float spd2 = 30f + (float)_rng.NextDouble() * 40f;
+                    _particles.Add(new Particle {
+                        Position = _playerPos, Velocity = new Vector2(MathF.Cos(a2) * spd2, MathF.Sin(a2) * spd2),
+                        Life = 0.4f, MaxLife = 0.4f, Color = new Color(170, 155, 130), Size = 2f
+                    });
+                }
+            }
+        }
+        
+        // Wall collision (push player out of walls) — skip when inside cave or ledge hopping
+        if (!_inCave && !_ledgeHopping && _screenWalls.TryGetValue(_currentScreen, out var walls))
         {
             var playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2), (int)PlayerSize, (int)PlayerSize);
             _screenWallOneWay.TryGetValue(_currentScreen, out var owList);
@@ -2855,10 +2896,46 @@ public class Game1 : Game
                 // ow=2: can pass from south → skip pushDown
                 // ow=3: can pass from west → skip pushLeft  
                 // ow=4: can pass from east → skip pushRight
-                if (ow == 1 && minPush == pushUp) { if (!_isJumping) { _isJumping = true; _jumpVelocity = JumpStrength * 0.5f; } continue; }
-                if (ow == 2 && minPush == pushDown) { if (!_isJumping) { _isJumping = true; _jumpVelocity = JumpStrength * 0.5f; } continue; }
-                if (ow == 3 && minPush == pushLeft) { if (!_isJumping) { _isJumping = true; _jumpVelocity = JumpStrength * 0.5f; } continue; }
-                if (ow == 4 && minPush == pushRight) { if (!_isJumping) { _isJumping = true; _jumpVelocity = JumpStrength * 0.5f; } continue; }
+                // One-way walls (ALttP ledge style):
+                // ow direction = direction player CAN hop THROUGH
+                // ow=1: hop up, ow=2: hop down, ow=3: hop left, ow=4: hop right
+                // Player is blocked normally; holding into the wall triggers a ledge hop
+                if (ow > 0 && !_ledgeHopping)
+                {
+                    // Check if player is pushing in the passable direction
+                    bool pushing = false;
+                    if (ow == 1 && minPush == pushDown && kb.IsKeyDown(Keys.W)) pushing = true; // push up into wall that lets you hop up
+                    if (ow == 2 && minPush == pushUp && kb.IsKeyDown(Keys.S)) pushing = true;
+                    if (ow == 3 && minPush == pushRight && kb.IsKeyDown(Keys.A)) pushing = true;
+                    if (ow == 4 && minPush == pushLeft && kb.IsKeyDown(Keys.D)) pushing = true;
+                    
+                    if (pushing && _ledgeHoldDir == ow)
+                    {
+                        _ledgeHoldTimer += dt;
+                        if (_ledgeHoldTimer >= LedgeHopHoldTime)
+                        {
+                            // Trigger ledge hop!
+                            _ledgeHopping = true;
+                            _ledgeHopTimer = 0f;
+                            _ledgeHopStart = _playerPos;
+                            // Target: one tile past the wall in the hop direction
+                            float hopDist = TSDst + PlayerSize;
+                            _ledgeHopTarget = _playerPos;
+                            if (ow == 1) _ledgeHopTarget.Y -= hopDist;
+                            if (ow == 2) _ledgeHopTarget.Y += hopDist;
+                            if (ow == 3) _ledgeHopTarget.X -= hopDist;
+                            if (ow == 4) _ledgeHopTarget.X += hopDist;
+                            _ledgeHoldTimer = 0f;
+                            _ledgeHoldDir = 0;
+                            continue; // skip push-out, hop will handle movement
+                        }
+                    }
+                    else
+                    {
+                        _ledgeHoldTimer = 0f;
+                        _ledgeHoldDir = pushing ? ow : 0;
+                    }
+                }
                 
                 if (minPush == pushLeft) _playerPos.X -= pushLeft;
                 else if (minPush == pushRight) _playerPos.X += pushRight;
@@ -25629,8 +25706,8 @@ public class Game1 : Game
                 int h = y2 - y1;
                 if (w >= TSDst && h >= TSDst)
                 {
-                    // Hold arrow key while releasing to set one-way direction
-                    // Arrow = direction you CAN pass FROM (e.g. Up arrow = can fall off from above)
+                    // Hold arrow key while releasing to set ledge direction
+                    // Arrow = direction player CAN HOP THROUGH (↓ = can jump down off ledge)
                     int oneWay = 0;
                     if (kb.IsKeyDown(Keys.Up)) oneWay = 1;
                     else if (kb.IsKeyDown(Keys.Down)) oneWay = 2;
@@ -25958,7 +26035,7 @@ public class Game1 : Game
                     DrawRect(rx + r.Width - 2, ry, 2, r.Height, c * 0.8f);
                     if (_trCollisionMode)
                     {
-                        string[] owLabels = { "", "↓ONE-WAY", "↑ONE-WAY", "→ONE-WAY", "←ONE-WAY" };
+                        string[] owLabels = { "", "↑HOP UP", "↓HOP DOWN", "←HOP LEFT", "→HOP RIGHT" };
                         string label = isOneWay ? owLabels[cr.OneWay] : $"{r.Width/TSDst}×{r.Height/TSDst}";
                         DrawTextFallback(rx + 4, ry + 4, label, Color.White * 0.6f, 0.5f);
                     }
@@ -26198,6 +26275,33 @@ public class Game1 : Game
         int eyeY = py + 4;
         DrawRect(eyeX, eyeY, 3, 3, Color.White);
         DrawRect(eyeX + (aimDir.X >= 0 ? 1 : 0), eyeY + 1, 1, 1, blk);
+        
+        // Sword swing arc (sprite-based)
+        if (_hasSword && _swordTimer > 0 && _swordTex != null)
+        {
+            float swingProgress = 1f - (_swordTimer / SwordSwingTime);
+            float baseAngle = MathF.Atan2(_swordDir.Y, _swordDir.X);
+            float sweepAngle = baseAngle + MathHelper.Lerp(-SwordArc / 2f, SwordArc / 2f, swingProgress);
+            var srcRect = new Rectangle(0, 0, 16, 16);
+            int drawSize = 48;
+            var origin = new Vector2(8, 14);
+            float dist = 20f;
+            float sx = pos.X + MathF.Cos(sweepAngle) * dist;
+            float sy = pos.Y + MathF.Sin(sweepAngle) * dist - jumpHeight;
+            float rot = sweepAngle + MathF.PI / 2f;
+            _spriteBatch.Draw(_swordTex, new Vector2(sx, sy), srcRect, Color.White,
+                rot, origin, drawSize / 16f, Microsoft.Xna.Framework.Graphics.SpriteEffects.None, 0f);
+            for (int t = 1; t <= 3; t++)
+            {
+                float trailAngle = sweepAngle - (SwordArc / 8f) * t;
+                float trailAlpha = (1f - t / 4f) * 0.3f;
+                float tsx = pos.X + MathF.Cos(trailAngle) * dist;
+                float tsy = pos.Y + MathF.Sin(trailAngle) * dist - jumpHeight;
+                float trot = trailAngle + MathF.PI / 2f;
+                _spriteBatch.Draw(_swordTex, new Vector2(tsx, tsy), srcRect, Color.White * trailAlpha,
+                    trot, origin, drawSize / 16f, Microsoft.Xna.Framework.Graphics.SpriteEffects.None, 0f);
+            }
+        }
         return;
         
         /* ORIGINAL KNIGHT DESIGN — preserved for later
