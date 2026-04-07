@@ -25470,9 +25470,9 @@ public class Game1 : Game
                 _roomCollision[_trPaintRoom] = new List<Rectangle>();
             var collRects = _roomCollision[_trPaintRoom];
             
-            // Mouse position in room-space (account for grid camera offset)
-            int cmx = mouse.X - gridX;
-            int cmy = mouse.Y - gridY;
+            // Mouse position in room-space (account for camera pan)
+            int cmx = mouse.X - camGX;
+            int cmy = mouse.Y - camGY;
             
             // Left-click drag to create rect
             if (mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released && mouse.Y > 50)
