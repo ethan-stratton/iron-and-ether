@@ -10888,9 +10888,9 @@ public class Game1 : Game
         // Cave entrance hitbox — the dark opening at the bottom of the cave structure
         _caveEntrance = new Rectangle(ax + 274, ay + 160, 48, 48);
         
-        // Cave interior area (takes over the whole arena when inside)
+        // Cave interior area — centered on screen
         int caveW = 400, caveH = 300;
-        int caveCX = ax + 286, caveCY = ay + 187;
+        int caveCX = ScreenW / 2, caveCY = ScreenH / 2;
         _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
         
         // Cave exit — at the bottom of the cave, light rays
@@ -10956,7 +10956,7 @@ public class Game1 : Game
         
         _caveEntrance = new Rectangle(ax + 274, ay + 160, 48, 48);
         int caveW = 400, caveH = 300;
-        int caveCX = ax + 286, caveCY = ay + 187;
+        int caveCX = ScreenW / 2, caveCY = ScreenH / 2;
         _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
         _caveExit = new Rectangle(caveCX - 30, caveCY + caveH / 2 - 20, 60, 20);
         
@@ -16008,7 +16008,7 @@ public class Game1 : Game
                 }
                 else
                 {
-                    _inCave = false;
+                    // Already on overworld — just finalize position
                     _playerPos = _caveReturnPos;
                 }
             }
@@ -16100,7 +16100,10 @@ public class Game1 : Game
         {
             if (_caveExit.Contains((int)_playerPos.X, (int)_playerPos.Y))
             {
-                _caveTransStartPos = _playerPos;
+                // Immediately switch to overworld, then play grow animation from cave entrance
+                _inCave = false;
+                _playerPos = _caveReturnPos;
+                _caveTransStartPos = new Vector2(_caveEntrance.Center.X, _caveEntrance.Center.Y);
                 _caveTransitionIn = false;
                 _caveTransitionTimer = CaveTransitionDuration;
                 _roomNameDisplay = AwakeningRoomNames[5];
@@ -16693,10 +16696,10 @@ public class Game1 : Game
             int dx, dy, dw, dh;
             switch (d.Side)
             {
-                case "N": dx = ax + aw / 2 - 50; dy = ay; dw = 100; dh = 20; break;
-                case "S": dx = ax + aw / 2 - 50; dy = ay + ah - 20; dw = 100; dh = 20; break;
-                case "W": dx = ax; dy = ay + ah / 2 - 50; dw = 20; dh = 100; break;
-                case "E": dx = ax + aw - 20; dy = ay + ah / 2 - 50; dw = 20; dh = 100; break;
+                case "N": dx = ax + aw / 2 - 50; dy = ay - TSDst; dw = 100; dh = 20; break;
+                case "S": dx = ax + aw / 2 - 50; dy = ay + ah - 20 + TSDst; dw = 100; dh = 20; break;
+                case "W": dx = ax - TSDst; dy = ay + ah / 2 - 50; dw = 20; dh = 100; break;
+                case "E": dx = ax + aw - 20 + TSDst; dy = ay + ah / 2 - 50; dw = 20; dh = 100; break;
                 default: continue;
             }
             
@@ -17492,7 +17495,7 @@ public class Game1 : Game
         _playerPos = new Vector2(_arena.Center.X, _arena.Center.Y);
         // Wand is inside cave — use cave center coords
         int ax5 = _arena.Left, ay5 = _arena.Top;
-        _wandPickupPos = new Vector2(ax5 + 287, ay5 + 184 - 10); // caveCX, caveCY - 10
+        _wandPickupPos = new Vector2(ScreenW / 2, ScreenH / 2 - 10); // cave center
         _shieldPickupPos = _playerPos + new Vector2(-60, 0);
         _currentScreen = 5;
         _inTransition = false;
@@ -21266,25 +21269,23 @@ public class Game1 : Game
         if (_caveTransitionTimer > 0)
         {
             float t = _caveTransitionTimer / CaveTransitionDuration; // 1→0
-            float fadeProgress = 1f - t; // 0→1
+            float progress = 1f - t; // 0→1
             
             if (_caveTransitionIn)
             {
-                // Walking into cave: player moves toward cave center, shrinks, screen darkens
+                // Entering cave: player walks toward cave, shrinks, screen darkens
                 Vector2 caveCenter = new Vector2(_caveEntrance.Center.X, _caveEntrance.Center.Y);
                 _playerPos = Vector2.Lerp(caveCenter, _caveTransStartPos, t);
-                // Shrink player (drawn smaller via scale)
                 _caveTransScale = MathHelper.Lerp(0.2f, 1f, t);
+                DrawRect(0, 0, ScreenW, ScreenH, Color.Black * progress);
             }
             else
             {
-                // Exiting cave: screen lightens, player grows from cave exit
-                Vector2 exitTarget = _caveReturnPos;
-                _playerPos = Vector2.Lerp(exitTarget, _caveTransStartPos, t);
-                _caveTransScale = MathHelper.Lerp(1f, 0.2f, t);
+                // Exiting cave: already on overworld, player grows from cave entrance to full size
+                Vector2 cavePos = _caveTransStartPos; // cave entrance center
+                _playerPos = Vector2.Lerp(_caveReturnPos, cavePos, t); // starts at cave, ends at return pos
+                _caveTransScale = MathHelper.Lerp(1f, 0.2f, t); // starts small, grows
             }
-            
-            DrawRect(0, 0, ScreenW, ScreenH, Color.Black * fadeProgress);
         }
         else
         {
@@ -23981,7 +23982,7 @@ public class Game1 : Game
         _spriteBatch.End();
 
         // ═══ LIGHTING PASS — Draw light mask, then composite with scene ═══
-        if (_lightGradient != null && _state == GameState.Playing)
+        if (_lightGradient != null && (_state == GameState.Playing || _state == GameState.Paused))
         {
             // 1. Draw light mask to _lightRT
             GraphicsDevice.SetRenderTarget(_lightRT);
@@ -24353,8 +24354,8 @@ public class Game1 : Game
         _postProcessEffect.Parameters["BloomIntensity"].SetValue(_bloomIntensity);
         _postProcessEffect.Parameters["VignetteRadius"].SetValue(1.1f);
         _postProcessEffect.Parameters["VignetteSmooth"].SetValue(0.55f);
-        float vx = _state == GameState.Playing ? (_playerPos.X - _cameraOffset.X) / 1280f : 0.5f;
-        float vy = _state == GameState.Playing ? (_playerPos.Y - _cameraOffset.Y) / 720f : 0.5f;
+        float vx = (_state == GameState.Playing || _state == GameState.Paused) ? (_playerPos.X - _cameraOffset.X) / 1280f : 0.5f;
+        float vy = (_state == GameState.Playing || _state == GameState.Paused) ? (_playerPos.Y - _cameraOffset.Y) / 720f : 0.5f;
         _postProcessEffect.Parameters["VignetteCenter"].SetValue(new Vector2(vx, vy));
         _postProcessEffect.Parameters["Time"].SetValue(_totalTime);
 
@@ -25032,6 +25033,16 @@ public class Game1 : Game
     
     // ═══════════════ TILE RENDERER MODE ═══════════════
     
+    private Rectangle GetPaintArena(int room)
+    {
+        if (room == 50) // Cave: 9×7 tiles centered on screen
+        {
+            int w = 9 * TSDst, h = 7 * TSDst;
+            return new Rectangle((ScreenW - w) / 2, (ScreenH - h) / 2, w, h);
+        }
+        return new Rectangle(60, 80, 1160, room == 11 ? 1300 : 580);
+    }
+    
     private (int cols, int rows) GetRoomTileSize(int room)
     {
         if (room == 50) return (9, 7); // Room 5b (cave interior): 400×300 → 9×7 tiles
@@ -25183,14 +25194,14 @@ public class Game1 : Game
             {
                 _trCameraPos = Vector2.Zero;
                 // Initialize walls/cave/torches for overlay
-                _arena = new Rectangle(60, 80, 1160, _trPaintRoom == 11 ? 1300 : 580);
+                _arena = GetPaintArena(_trPaintRoom);
                 InitScreenWalls();
                 InitAwakeningDoors();
                 // Set up cave data for room 5
                 int ax = _arena.Left, ay = _arena.Top;
                 _caveEntrance = new Rectangle(ax + 274, ay + 160, 48, 48);
                 int caveW = 400, caveH = 300;
-                int caveCX = ax + 286, caveCY = ay + 187;
+                int caveCX = ScreenW / 2, caveCY = ScreenH / 2;
                 _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
             }
         }
@@ -25292,7 +25303,7 @@ public class Game1 : Game
             int idx = Array.IndexOf(paintRooms, _trPaintRoom);
             if (idx > 0) _trPaintRoom = paintRooms[idx - 1];
             _trCameraPos = Vector2.Zero;
-            _arena = new Rectangle(60, 80, 1160, _trPaintRoom == 11 ? 1300 : 580);
+            _arena = GetPaintArena(_trPaintRoom);
             InitScreenWalls(); InitAwakeningDoors();
         }
         if (kb.IsKeyDown(Keys.Right) && !_prevKb.IsKeyDown(Keys.Right))
@@ -25300,7 +25311,7 @@ public class Game1 : Game
             int idx = Array.IndexOf(paintRooms, _trPaintRoom);
             if (idx < paintRooms.Length - 1) _trPaintRoom = paintRooms[idx + 1];
             _trCameraPos = Vector2.Zero;
-            _arena = new Rectangle(60, 80, 1160, _trPaintRoom == 11 ? 1300 : 580);
+            _arena = GetPaintArena(_trPaintRoom);
             InitScreenWalls(); InitAwakeningDoors();
         }
         
