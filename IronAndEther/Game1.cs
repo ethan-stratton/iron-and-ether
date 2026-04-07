@@ -47,7 +47,13 @@ public class Game1 : Game
     // Layer 0 = background (floor), Layer 1 = foreground (walls/trees/overlays)
     private Dictionary<int, (int sheet, int tile)[,]> _roomTileData = new();
     private Dictionary<int, (int sheet, int tile)[,]> _roomTileOverlay = new();
+    private Dictionary<int, List<Rectangle>> _roomCollision = new(); // per-room collision rects
     private int _trActiveLayer = 0; // 0=background, 1=overlay
+    private bool _trCollisionMode = false; // C key toggles collision editing
+    private bool _trDraggingCollision = false;
+    private Point _trCollDragStart;
+    private int _trCollDragIdx = -1; // index of rect being resized, or -1 for new
+    private int _trCollHoverIdx = -1; // which collision rect the mouse is over
     private const int TileSrc = 12; // source tile size in tileset
     private const int TileScale = 3; // display scale
     private const int TileDst = TileSrc * TileScale; // 36px displayed
@@ -17689,6 +17695,19 @@ public class Game1 : Game
             new(ax + 80, ay + _arena.Height - 104, 24, 24),
             new(ax + _arena.Width - 104, ay + _arena.Height - 104, 24, 24),
         };
+        
+        // Override with editor-placed collision rects (room_tiles.json)
+        foreach (var kvp in _roomCollision)
+        {
+            int room = kvp.Key;
+            if (room == 50) continue; // cave collision handled separately
+            if (!_screenWalls.ContainsKey(room))
+                _screenWalls[room] = new List<Rectangle>();
+            else
+                _screenWalls[room].Clear(); // editor collision replaces hardcoded
+            foreach (var r in kvp.Value)
+                _screenWalls[room].Add(r); // collision coords are room-space (0,0 = screen top-left)
+        }
     }
 
     private void FireWeapon(Vector2 mousePos, float chargePercent = 0f)
@@ -25129,19 +25148,21 @@ public class Game1 : Game
     
     private void SaveRoomTiles()
     {
-        // Save as {"rooms":{"5":{"bg":[...],"fg":[...]},...}}
-        var rooms = new Dictionary<string, Dictionary<string, int?[][]>>();
-        // Collect all room keys from both layers
+        // Save as {"rooms":{"5":{"bg":[...],"fg":[...],"collision":[[x,y,w,h],...]}, ...}}
+        var rooms = new Dictionary<string, Dictionary<string, object>>();
         var allRooms = new HashSet<int>(_roomTileData.Keys);
         foreach (var k in _roomTileOverlay.Keys) allRooms.Add(k);
+        foreach (var k in _roomCollision.Keys) allRooms.Add(k);
         
         foreach (int room in allRooms)
         {
-            var entry = new Dictionary<string, int?[][]>();
+            var entry = new Dictionary<string, object>();
             if (_roomTileData.TryGetValue(room, out var bg))
                 entry["bg"] = TileLayerToArray(bg);
             if (_roomTileOverlay.TryGetValue(room, out var fg))
                 entry["fg"] = TileLayerToArray(fg);
+            if (_roomCollision.TryGetValue(room, out var coll) && coll.Count > 0)
+                entry["collision"] = coll.Select(r => new int[] { r.X, r.Y, r.Width, r.Height }).ToArray();
             rooms[room.ToString()] = entry;
         }
         var wrapper = new Dictionary<string, object> { ["rooms"] = rooms };
@@ -25162,8 +25183,9 @@ public class Game1 : Game
             var root = doc.RootElement;
             _roomTileData.Clear();
             _roomTileOverlay.Clear();
+            _roomCollision.Clear();
             
-            // New format: {"rooms":{"5":{"bg":[...],"fg":[...]}}}
+            // New format: {"rooms":{"5":{"bg":[...],"fg":[...],"collision":[[x,y,w,h],...]}}}
             if (root.TryGetProperty("rooms", out var roomsElem))
             {
                 foreach (var prop in roomsElem.EnumerateObject())
@@ -25173,6 +25195,18 @@ public class Game1 : Game
                         _roomTileData[roomNum] = ArrayToTileLayer(bgElem);
                     if (prop.Value.TryGetProperty("fg", out var fgElem))
                         _roomTileOverlay[roomNum] = ArrayToTileLayer(fgElem);
+                    if (prop.Value.TryGetProperty("collision", out var collElem))
+                    {
+                        var rects = new List<Rectangle>();
+                        foreach (var arr in collElem.EnumerateArray())
+                        {
+                            var vals = arr.EnumerateArray().Select(v => v.GetInt32()).ToArray();
+                            if (vals.Length >= 4)
+                                rects.Add(new Rectangle(vals[0], vals[1], vals[2], vals[3]));
+                        }
+                        if (rects.Count > 0)
+                            _roomCollision[roomNum] = rects;
+                    }
                 }
             }
             else
@@ -25339,6 +25373,13 @@ public class Game1 : Game
         if (kb.IsKeyDown(Keys.G) && !_prevKb.IsKeyDown(Keys.G))
             _trShowOverlay = !_trShowOverlay;
         
+        // C = toggle collision editing mode
+        if (kb.IsKeyDown(Keys.C) && !_prevKb.IsKeyDown(Keys.C))
+        {
+            _trCollisionMode = !_trCollisionMode;
+            _trDraggingCollision = false;
+        }
+        
         // L = toggle layer (0=bg, 1=fg overlay)
         if (kb.IsKeyDown(Keys.L) && !_prevKb.IsKeyDown(Keys.L))
             _trActiveLayer = 1 - _trActiveLayer;
@@ -25367,7 +25408,7 @@ public class Game1 : Game
         int camGY = gridY - (int)_trCameraPos.Y;
         
         // Left-click on palette to select tile
-        if (mouse.LeftButton == ButtonState.Pressed)
+        if (mouse.LeftButton == ButtonState.Pressed && !_trCollisionMode)
         {
             if (mouse.X < palW && mouse.Y > 50)
             {
@@ -25411,7 +25452,7 @@ public class Game1 : Game
         }
         
         // Right-click = erase
-        if (mouse.RightButton == ButtonState.Pressed && mouse.X >= palW)
+        if (mouse.RightButton == ButtonState.Pressed && mouse.X >= palW && !_trCollisionMode)
         {
             int gc = (mouse.X - camGX) / TSDst;
             int gr = (mouse.Y - camGY) / TSDst;
@@ -25419,6 +25460,64 @@ public class Game1 : Game
             {
                 var data = _trActiveLayer == 0 ? GetOrCreateRoomTiles(_trPaintRoom) : GetOrCreateRoomOverlay(_trPaintRoom);
                 data[gr, gc] = (-1, -1);
+            }
+        }
+        
+        // ═══ Collision Editing Mode ═══
+        if (_trCollisionMode && mouse.X >= palW)
+        {
+            if (!_roomCollision.ContainsKey(_trPaintRoom))
+                _roomCollision[_trPaintRoom] = new List<Rectangle>();
+            var collRects = _roomCollision[_trPaintRoom];
+            
+            // Mouse position in room-space (account for grid camera offset)
+            int cmx = mouse.X - gridX;
+            int cmy = mouse.Y - gridY;
+            
+            // Left-click drag to create rect
+            if (mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released && mouse.Y > 50)
+            {
+                _trDraggingCollision = true;
+                _trCollDragStart = new Point(cmx, cmy);
+            }
+            
+            if (_trDraggingCollision && mouse.LeftButton == ButtonState.Released)
+            {
+                _trDraggingCollision = false;
+                int x1 = Math.Min(_trCollDragStart.X, cmx);
+                int y1 = Math.Min(_trCollDragStart.Y, cmy);
+                int x2 = Math.Max(_trCollDragStart.X, cmx);
+                int y2 = Math.Max(_trCollDragStart.Y, cmy);
+                // Snap to tile grid
+                x1 = (x1 / TSDst) * TSDst;
+                y1 = (y1 / TSDst) * TSDst;
+                x2 = ((x2 + TSDst - 1) / TSDst) * TSDst;
+                y2 = ((y2 + TSDst - 1) / TSDst) * TSDst;
+                int w = x2 - x1;
+                int h = y2 - y1;
+                if (w >= TSDst && h >= TSDst)
+                {
+                    collRects.Add(new Rectangle(x1, y1, w, h));
+                    SaveRoomTiles();
+                }
+            }
+            
+            // Right-click to delete hovered rect
+            _trCollHoverIdx = -1;
+            for (int i = collRects.Count - 1; i >= 0; i--)
+            {
+                if (collRects[i].Contains(cmx, cmy))
+                {
+                    _trCollHoverIdx = i;
+                    break;
+                }
+            }
+            
+            if (mouse.RightButton == ButtonState.Pressed && _prevMouse.RightButton == ButtonState.Released && _trCollHoverIdx >= 0)
+            {
+                collRects.RemoveAt(_trCollHoverIdx);
+                _trCollHoverIdx = -1;
+                SaveRoomTiles();
             }
         }
     }
@@ -25693,6 +25792,48 @@ public class Game1 : Game
             }
         }
         
+        // ═══ Collision rects (always visible when in collision mode or overlay) ═══
+        if (_trCollisionMode || _trShowOverlay)
+        {
+            if (_roomCollision.TryGetValue(_trPaintRoom, out var drawColl))
+            {
+                for (int i = 0; i < drawColl.Count; i++)
+                {
+                    var r = drawColl[i];
+                    int rx = gridX + r.X, ry = gridY + r.Y;
+                    Color c = (i == _trCollHoverIdx && _trCollisionMode) ? Color.Red : new Color(255, 80, 80);
+                    float alpha = _trCollisionMode ? 0.4f : 0.2f;
+                    DrawRect(rx, ry, r.Width, r.Height, c * alpha);
+                    DrawRect(rx, ry, r.Width, 2, c * 0.8f);
+                    DrawRect(rx, ry + r.Height - 2, r.Width, 2, c * 0.8f);
+                    DrawRect(rx, ry, 2, r.Height, c * 0.8f);
+                    DrawRect(rx + r.Width - 2, ry, 2, r.Height, c * 0.8f);
+                    if (_trCollisionMode)
+                        DrawTextFallback(rx + 4, ry + 4, $"{r.Width/TSDst}×{r.Height/TSDst}", Color.White * 0.6f, 0.5f);
+                }
+            }
+            
+            // Draw drag preview
+            if (_trCollisionMode && _trDraggingCollision)
+            {
+                var ms = Mouse.GetState();
+                int cmx = ms.X - gridX, cmy = ms.Y - gridY;
+                int x1 = Math.Min(_trCollDragStart.X, cmx);
+                int y1 = Math.Min(_trCollDragStart.Y, cmy);
+                int x2 = Math.Max(_trCollDragStart.X, cmx);
+                int y2 = Math.Max(_trCollDragStart.Y, cmy);
+                x1 = (x1 / TSDst) * TSDst;
+                y1 = (y1 / TSDst) * TSDst;
+                x2 = ((x2 + TSDst - 1) / TSDst) * TSDst;
+                y2 = ((y2 + TSDst - 1) / TSDst) * TSDst;
+                DrawRect(gridX + x1, gridY + y1, x2 - x1, y2 - y1, Color.Yellow * 0.3f);
+                DrawRect(gridX + x1, gridY + y1, x2 - x1, 2, Color.Yellow);
+                DrawRect(gridX + x1, gridY + y1 + (y2 - y1) - 2, x2 - x1, 2, Color.Yellow);
+                DrawRect(gridX + x1, gridY + y1, 2, y2 - y1, Color.Yellow);
+                DrawRect(gridX + x1 + (x2 - x1) - 2, gridY + y1, 2, y2 - y1, Color.Yellow);
+            }
+        }
+        
         // ── Palette (left side, fixed) ──
         DrawRect(0, 50, palW, ScreenH - 50, new Color(25, 25, 30));
         
@@ -25739,12 +25880,15 @@ public class Game1 : Game
         
         // ── Header (fixed) ──
         DrawRect(0, 0, ScreenW, 50, new Color(15, 15, 20, 230));
-        string layerStr = _trActiveLayer == 0 ? "BG" : "FG";
-        string selStr = _trSelectedTile >= 0 ? $"{_tsNames[_trSelectedSheet]}#{_trSelectedTile}" : "ERASER";
+        string layerStr = _trCollisionMode ? "COLLISION" : (_trActiveLayer == 0 ? "BG" : "FG");
+        string selStr = _trCollisionMode ? "Click+drag=add, Right-click=delete" : (_trSelectedTile >= 0 ? $"{_tsNames[_trSelectedSheet]}#{_trSelectedTile}" : "ERASER");
         string roomLabel = _trPaintRoom == 50 ? "5b (Cave)" : _trPaintRoom.ToString();
-        string header = $"PAINT — Room {roomLabel} ({roomCols}×{roomRows})  |  Layer: {layerStr}  |  Tile: {selStr}  |  Palette: {_tsNames[_trSheetIdx]}";
-        DrawTextOutlined(10, 6, header, new Color(200, 170, 100), Color.Black, 0.9f);
-        string controls = "WASD:pan  L/R:room  TAB:sheet  L:layer  Click:paint  RClick:erase  X:eraser  F:fill  G:overlay  Ctrl+S:save  ESC:back";
+        string header = $"PAINT — Room {roomLabel} ({roomCols}×{roomRows})  |  Mode: {layerStr}  |  {selStr}";
+        Color headerColor = _trCollisionMode ? new Color(255, 100, 100) : new Color(200, 170, 100);
+        DrawTextOutlined(10, 6, header, headerColor, Color.Black, 0.9f);
+        string controls = _trCollisionMode 
+            ? "WASD:pan  L/R:room  C:tiles  Click+drag:add wall  RClick:delete  Ctrl+S:save  ESC:back"
+            : "WASD:pan  L/R:room  TAB:sheet  L:layer  C:collision  Click:paint  RClick:erase  X:eraser  F:fill  G:overlay  Ctrl+S:save  ESC:back";
         DrawTextOutlined(10, 28, controls, new Color(100, 100, 120), Color.Black, 0.65f);
         
         _spriteBatch.End();
