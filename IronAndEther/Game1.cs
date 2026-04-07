@@ -17600,11 +17600,33 @@ public class Game1 : Game
         InitScreenWalls();
     }
 
-    // Torch tile IDs — (sheet, tileId) pairs for light-emitting tiles
-    // Sheet 0 (dungeon): 264 = standalone torch, 293 = two-tile torch bottom, 318 = wall torch, 381 = campfire
+    // Light-emitting tile IDs — (sheet, tileId) pairs
+    // Sheet 0 (dungeon): torches, lava, flames
+    // Sheet 1 (exterior): torch, campfire
+    // Sheet 2 (interior): campfire, torch, lava, candles, lantern
+    // Sheet 4 (world): torch
     private static readonly HashSet<(int sheet, int tile)> TorchTilePairs = new()
     {
-        (0, 264), (0, 293), (0, 318), (0, 381)
+        // Dungeon (0): lava
+        (0,243),(0,245),(0,273),(0,274),(0,275),(0,303),(0,304),(0,305),(0,333),(0,334),(0,335),
+        // Dungeon (0): torches
+        (0,263),(0,264),
+        // Dungeon (0): flames
+        (0,207),(0,208),(0,209),
+        // Exterior (1): torch + campfire
+        (1,318),(1,381),
+        // Interior (2): campfire stack
+        (2,124),(2,154),(2,184),(2,214),
+        // Interior (2): torch
+        (2,24),
+        // Interior (2): lava
+        (2,232),
+        // Interior (2): candle + lantern
+        (2,204),(2,206),
+        // Interior (2): candles
+        (2,381),(2,383),(2,441),(2,443),
+        // World (4): torch
+        (4,144),
     };
     
     private void AddTorchesFromTiles(int room)
