@@ -846,7 +846,7 @@ public class Game1 : Game
     // Sword
     private Texture2D _swordTex; // Exotic Swords sprite sheet
     private Texture2D _playerTex; // Knight sprite sheet
-    private const int KF_W = 26, KF_H = 36; // knight frame size
+    private const int KF_W = 26, KF_H = 32; // knight frame size (cropped 4px shadow from bottom)
     private const int KF_COL = 6; // 3rd knight starts at column 6 (0-indexed)
     private float _walkAnimTimer = 0f;
     private int _walkFrame = 0; // 0,1,2 walk cycle
@@ -26462,7 +26462,7 @@ public class Game1 : Game
             int srcY = _facingDir * KF_H;
             var srcRect = new Rectangle(srcX, srcY, KF_W, KF_H);
             float scale = 2.5f; // 26×36 → 65×90 display
-            var origin = new Vector2(KF_W / 2f, KF_H - 4f); // anchor at feet
+            var origin = new Vector2(KF_W / 2f, KF_H); // anchor at feet (shadow already cropped)
             var drawPos = new Vector2(pos.X, pos.Y + PlayerSize / 2f);
             
             // Hit flash
