@@ -3079,6 +3079,8 @@ public class Game1 : Game
                         _ledgeHoldTimer = 0f;
                         _ledgeHoldDir = pushing ? ow : 0;
                     }
+                    // One-way walls NEVER block — they only trigger hops
+                    continue;
                 }
                 
                 if (minPush == pushLeft) _playerPos.X -= pushLeft;
@@ -25707,10 +25709,9 @@ public class Game1 : Game
         _trCameraPos.X = MathHelper.Clamp(_trCameraPos.X, 0, maxCX);
         _trCameraPos.Y = MathHelper.Clamp(_trCameraPos.Y, 0, maxCY);
         
-        // Left/Right to switch rooms
-        // Room cycling: 1-11 then 50 (cave)
+        // Left/Right to switch rooms (disabled in collision mode — arrows set ledge direction)
         int[] paintRooms = { 1, 2, 3, 4, 5, 50, 6, 7, 8, 9, 11 };
-        if (kb.IsKeyDown(Keys.Left) && !_prevKb.IsKeyDown(Keys.Left))
+        if (!_trCollisionMode && kb.IsKeyDown(Keys.Left) && !_prevKb.IsKeyDown(Keys.Left))
         {
             int idx = Array.IndexOf(paintRooms, _trPaintRoom);
             if (idx > 0) _trPaintRoom = paintRooms[idx - 1];
@@ -25718,7 +25719,7 @@ public class Game1 : Game
             _arena = GetPaintArena(_trPaintRoom);
             InitScreenWalls(); InitAwakeningDoors();
         }
-        if (kb.IsKeyDown(Keys.Right) && !_prevKb.IsKeyDown(Keys.Right))
+        if (!_trCollisionMode && kb.IsKeyDown(Keys.Right) && !_prevKb.IsKeyDown(Keys.Right))
         {
             int idx = Array.IndexOf(paintRooms, _trPaintRoom);
             if (idx < paintRooms.Length - 1) _trPaintRoom = paintRooms[idx + 1];
