@@ -26184,20 +26184,46 @@ public class Game1 : Game
             if (_trCollisionMode && _trDraggingCollision)
             {
                 var ms = Mouse.GetState();
+                var kbs = Keyboard.GetState();
                 int cmx = ms.X - gridX, cmy = ms.Y - gridY;
                 int x1 = Math.Min(_trCollDragStart.X, cmx);
                 int y1 = Math.Min(_trCollDragStart.Y, cmy);
                 int x2 = Math.Max(_trCollDragStart.X, cmx);
                 int y2 = Math.Max(_trCollDragStart.Y, cmy);
-                x1 = (x1 / TSDst) * TSDst;
-                y1 = (y1 / TSDst) * TSDst;
-                x2 = ((x2 + TSDst - 1) / TSDst) * TSDst;
-                y2 = ((y2 + TSDst - 1) / TSDst) * TSDst;
+                int snap = kbs.IsKeyDown(Keys.LeftShift) || kbs.IsKeyDown(Keys.RightShift) ? TSDst / 2 : TSDst;
+                x1 = (x1 / snap) * snap;
+                y1 = (y1 / snap) * snap;
+                x2 = ((x2 + snap - 1) / snap) * snap;
+                y2 = ((y2 + snap - 1) / snap) * snap;
                 DrawRect(gridX + x1, gridY + y1, x2 - x1, y2 - y1, Color.Yellow * 0.3f);
                 DrawRect(gridX + x1, gridY + y1, x2 - x1, 2, Color.Yellow);
                 DrawRect(gridX + x1, gridY + y1 + (y2 - y1) - 2, x2 - x1, 2, Color.Yellow);
                 DrawRect(gridX + x1, gridY + y1, 2, y2 - y1, Color.Yellow);
                 DrawRect(gridX + x1 + (x2 - x1) - 2, gridY + y1, 2, y2 - y1, Color.Yellow);
+            }
+            
+            // Collision cursor — crosshair + snapped cell highlight
+            if (_trCollisionMode && !_trDraggingCollision)
+            {
+                var ms = Mouse.GetState();
+                var kbs = Keyboard.GetState();
+                int cmx = ms.X - gridX, cmy = ms.Y - gridY;
+                int snap = kbs.IsKeyDown(Keys.LeftShift) || kbs.IsKeyDown(Keys.RightShift) ? TSDst / 2 : TSDst;
+                int cellX = (cmx / snap) * snap;
+                int cellY = (cmy / snap) * snap;
+                int sx = gridX + cellX, sy = gridY + cellY;
+                // Highlight snapped cell
+                DrawRect(sx, sy, snap, snap, Color.White * 0.15f);
+                DrawRect(sx, sy, snap, 1, Color.White * 0.5f);
+                DrawRect(sx, sy + snap - 1, snap, 1, Color.White * 0.5f);
+                DrawRect(sx, sy, 1, snap, Color.White * 0.5f);
+                DrawRect(sx + snap - 1, sy, 1, snap, Color.White * 0.5f);
+                // Crosshair
+                DrawRect(ms.X - 8, ms.Y, 17, 1, Color.White * 0.6f);
+                DrawRect(ms.X, ms.Y - 8, 1, 17, Color.White * 0.6f);
+                // Snap size indicator
+                string snapLabel = snap == TSDst / 2 ? "½" : "1×1";
+                DrawTextFallback(ms.X + 10, ms.Y - 14, snapLabel, Color.White * 0.5f, 0.6f);
             }
         }
         
