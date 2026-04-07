@@ -11058,9 +11058,11 @@ public class Game1 : Game
                 break;
         }
         
+        // Auto-populate torches from painted tile data (overrides hardcoded if room has tile data)
+        AddTorchesFromTiles(screen);
+        
         switch (screen)
         {
-            case 2: InitAwakeningRoom2(); break;
             case 1: InitAwakeningRoom1(); break;
             case 3: InitAwakeningRoom3(); break;
             case 4: InitAwakeningRoom4(); break;
@@ -17598,6 +17600,50 @@ public class Game1 : Game
         InitScreenWalls();
     }
 
+    // Torch tile IDs (from OpenRPG tileset sheet 0 = dungeon)
+    // 264 = standalone torch, 265+293 = two-tile torch (top+bottom), 318 = wall torch, 381 = campfire
+    private static readonly HashSet<int> TorchTileIds = new() { 264, 265, 293, 318, 381 };
+    
+    private void AddTorchesFromTiles(int room)
+    {
+        // Scan both BG and FG layers for torch tiles
+        void ScanLayer((int sheet, int tile)[,]? layer)
+        {
+            if (layer == null) return;
+            int rows = layer.GetLength(0), cols = layer.GetLength(1);
+            for (int r = 0; r < rows; r++)
+            {
+                for (int c = 0; c < cols; c++)
+                {
+                    var (s, t) = layer[r, c];
+                    if (s >= 0 && TorchTileIds.Contains(t))
+                    {
+                        // Place torch at center of tile cell
+                        float tx = c * TSDst + TSDst / 2f;
+                        float ty = r * TSDst + TSDst / 2f;
+                        // Avoid duplicates (same position from BG+FG)
+                        bool dup = false;
+                        foreach (var existing in _torches)
+                            if (MathF.Abs(existing.X - tx) < 4 && MathF.Abs(existing.Y - ty) < 4) { dup = true; break; }
+                        if (!dup) _torches.Add(new Vector2(tx, ty));
+                    }
+                }
+            }
+        }
+        
+        // Only add from tiles if the room has painted tile data
+        bool hasTiles = _roomTileData.ContainsKey(room) || _roomTileOverlay.ContainsKey(room);
+        if (!hasTiles) return;
+        
+        // Clear hardcoded torches — tile data takes over
+        _torches.Clear();
+        
+        _roomTileData.TryGetValue(room, out var bg);
+        _roomTileOverlay.TryGetValue(room, out var fg);
+        ScanLayer(bg);
+        ScanLayer(fg);
+    }
+    
     private void InitScreenWalls()
     {
         _screenWalls.Clear();
