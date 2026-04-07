@@ -17667,6 +17667,7 @@ public class Game1 : Game
         _roomTileOverlay.TryGetValue(room, out var fg);
         ScanLayer(bg);
         ScanLayer(fg);
+        System.Console.WriteLine($"AddTorchesFromTiles room={room}: hasBG={bg!=null} hasFG={fg!=null} torchCount={_torches.Count}");
     }
     
     private void InitScreenWalls()
