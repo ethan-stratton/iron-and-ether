@@ -1848,7 +1848,7 @@ public class Game1 : Game
             
             // ═══ Sack grid interaction ═══
             int _sgX = ScreenW / 2 - (SackGridSize * SackCellSize) / 2;
-            int _sgY = InvPanelY + 520 - SackGridSize * SackCellSize - 50; // match draw position
+            int _sgY = InvPanelY + 620 - SackGridSize * SackCellSize - 50; // match draw position
             int gridW_ = SackGridSize * SackCellSize;
             int gridH_ = SackGridSize * SackCellSize;
             int smxG = ((int)_mouseWorld.X - _sgX) / SackCellSize;
@@ -20620,7 +20620,7 @@ public class Game1 : Game
     private const int InvPanelX = 60;
     private const int InvHeaderH = 38;
     private const int InvLabelH = 24;
-    private const int InvRowGap = 30;
+    private const int InvRowGap = 26;
     private const int InvItemIndent = 20;
     private const int InvItemGap = 16;
     
@@ -26596,79 +26596,63 @@ public class Game1 : Game
     {
         int hudY = 10;
         
-        // ═══ LOADOUT CARDS — two overlapping panels that flip on Q swap ═══
-        // Swap animation: 0→1 means active slides up, inactive slides down
+        // ═══ LOADOUT CARDS — combo title cards that flip on Q swap ═══
         float swapT = _loadoutSwapTimer > 0 ? 1f - (_loadoutSwapTimer / LoadoutSwapDuration) : 1f;
         float smoothSwap = swapT * swapT * (3f - 2f * swapT); // smoothstep
         
-        // Active card: sits at top (hudY). Inactive: peeks out below + right.
-        int cardW = 520, cardH = 50;
-        int peekX = 8, peekY = 12; // how much inactive card peeks out
+        int cardX = 10, cardW = 280, cardH = 36;
+        int peekX = 6, peekY = 10;
         
-        // During swap, cards cross: active slides from peek→top, old active slides top→peek
         float activeY = hudY;
         float inactiveY = hudY + peekY;
-        float inactiveX = peekX;
         
         if (_loadoutSwapTimer > 0)
         {
-            // Animating: new active rising from below, old sinking
             activeY = MathHelper.Lerp(hudY + peekY, hudY, smoothSwap);
             inactiveY = MathHelper.Lerp(hudY, hudY + peekY, smoothSwap);
         }
         
-        // Get both loadouts' display info
+        // Resolve both loadout names
         var activeLo = _loadout;
         var inactiveLo = _loadoutSecondary;
         var activeParms = ProjectileParams.Resolve(activeLo);
         var activeEssCol = new Color(activeParms.Color.R, activeParms.Color.G, activeParms.Color.B);
-        var inactiveParms = ProjectileParams.Resolve(inactiveLo);
-        var inactiveEssCol = new Color(inactiveParms.Color.R, inactiveParms.Color.G, inactiveParms.Color.B);
+        
+        // Get combo names (fusion > dual > default)
+        string activeComboName = _currentFusion ?? _currentDualCombo ?? activeLo.ComboName;
+        string inactiveComboName = inactiveLo.ComboName; // no fusion tracking for inactive
         
         Color activeAccent = _loadoutIsPrimary ? new Color(255, 200, 100) : new Color(100, 200, 255);
         Color inactiveAccent = _loadoutIsPrimary ? new Color(100, 200, 255) : new Color(255, 200, 100);
         
-        // Draw INACTIVE card first (behind)
-        float dimA = 0.4f;
-        DrawRect(42 + (int)inactiveX, (int)inactiveY, cardW, cardH, new Color(20, 20, 28));
-        DrawRect(42 + (int)inactiveX, (int)inactiveY, cardW, 2, inactiveAccent * dimA);
-        string inLabel = _loadoutIsPrimary ? "S" : "P";
-        DrawTextFallback(42 + (int)inactiveX + 4, (int)inactiveY + 4, $"[{inLabel}]", inactiveAccent * dimA, 0.8f);
-        // Inactive slot text (dimmed)
-        string iForm = inactiveLo.Form == Form.None ? "---" : inactiveLo.FormName;
-        string iBeh = inactiveLo.Behavior == Behavior.None ? "---" : inactiveLo.BehaviorName;
-        string iEss = inactiveLo.Essence == Essence.None ? "---" : inactiveLo.EssenceName;
-        DrawTextFallback(42 + (int)inactiveX + 36, (int)inactiveY + 24, $"{iForm}  /  {iBeh}  /  {iEss}", Color.Gray * dimA, 0.8f);
+        // INACTIVE card (behind) — peeking out
+        float dimA = 0.45f;
+        DrawRect(cardX + peekX, (int)inactiveY, cardW, cardH, new Color(18, 18, 25));
+        DrawRect(cardX + peekX, (int)inactiveY, cardW, 2, inactiveAccent * dimA);
+        DrawTextFallback(cardX + peekX + 8, (int)inactiveY + 12, inactiveComboName, Color.Gray * dimA);
         
-        // Draw ACTIVE card on top
-        DrawRect(42, (int)activeY, cardW, cardH, new Color(25, 25, 35));
-        DrawRect(42, (int)activeY, cardW, 2, activeAccent);
-        string aLabel = _loadoutIsPrimary ? "P" : "S";
-        DrawTextFallback(46, (int)activeY + 4, $"[{aLabel}]  Q to swap", activeAccent, 0.8f);
-        // Active slot boxes (inline)
-        string formDisplay = _hasWand ? activeLo.FormName : "---";
-        int slotX = 42;
-        DrawSlotBox(slotX, (int)activeY, "1:FORM", formDisplay, new Color(200, 80, 80));
-        DrawSlotBox(slotX + 160, (int)activeY, "2:BEHAVIOR", activeLo.BehaviorName, new Color(80, 200, 80));
-        DrawSlotBox(slotX + 320, (int)activeY, "3:ESSENCE", activeLo.EssenceName, activeEssCol);
+        // ACTIVE card (top)
+        DrawRect(cardX, (int)activeY, cardW, cardH, new Color(25, 25, 35));
+        DrawRect(cardX, (int)activeY, cardW, 2, activeAccent);
+        DrawTextFallback(cardX + 8, (int)activeY + 4, "Q", activeAccent * 0.5f, 0.7f);
+        DrawTextFallback(cardX + 22, (int)activeY + 4, activeComboName, Color.White, 1.1f);
+        // Essence color dot
+        DrawRect(cardX + cardW - 16, (int)activeY + 12, 10, 10, activeEssCol);
         
         var parms = activeParms;
         var essenceColor = activeEssCol;
         
-        // Utility essence (right side)
+        // Utility essence (right side of screen)
         string utilName = _utilityEssence == Essence.None ? "---" : _utilityEssence.ToString();
         Color utilColor = _utilityEssence == Essence.None ? Color.Gray : GetEssenceColor(_utilityEssence);
         DrawSlotBox(ScreenW - 170, hudY, "E:UTILITY", utilName, utilColor);
-
-        string comboName = _currentFusion ?? _currentDualCombo ?? _loadout.ComboName;
-        Color comboColor = _currentFusion != null ? new Color(255, 215, 0) : _currentDualCombo != null ? new Color(150, 200, 255) : Color.White;
-        // Combo name right of slot boxes, row 1
-        DrawTextFallback(556, hudY + 2, comboName, comboColor);
-        // Stats below combo name
-        string statsText = $"DMG:{parms.BaseDamage:F0} SPD:{parms.Speed:F0} FR:{parms.FireRate:F2}s";
-        DrawTextFallback(556, hudY + 16, statsText, Color.Gray);
+        
+        // Stats line below active card
+        string statsLine = $"DMG:{parms.BaseDamage:F0}  SPD:{parms.Speed:F0}  FR:{parms.FireRate:F2}s";
+        DrawTextFallback(cardX + 8, (int)activeY + cardH + 4, statsLine, Color.Gray * 0.6f, 0.7f);
+        
         if (_gameMode != GameMode.Awakening)
-            DrawTextFallback(556, hudY + 30, $"Wave {_wave}  Kills {_killCount}/{_waveKillTarget}", Color.Gray);
+            DrawTextFallback(cardX + 8, (int)activeY + cardH + 16, $"Wave {_wave}  Kills {_killCount}/{_waveKillTarget}", Color.Gray * 0.5f, 0.7f);
 
         // Fusion/combo name above arena
         if (_currentFusion != null && _fusionFlashTimer > 0)
@@ -27065,7 +27049,7 @@ public class Game1 : Game
         // ═══════════════ TAB INVENTORY PANEL ═══════════════
         if (_inventorySlide > 0.01f)
         {
-            int panelMaxH = 520;
+            int panelMaxH = 620;
             int panelH = (int)(panelMaxH * _inventorySlide);
             int panelY = _arena.Top - 2;
             
