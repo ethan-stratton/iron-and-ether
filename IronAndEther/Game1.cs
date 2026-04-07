@@ -2751,9 +2751,9 @@ public class Game1 : Game
             }
         }
         
-        // Clamp to arena
-        _playerPos.X = MathHelper.Clamp(_playerPos.X, _arena.Left + PlayerSize, _arena.Right - PlayerSize);
-        _playerPos.Y = MathHelper.Clamp(_playerPos.Y, _arena.Top + PlayerSize, _arena.Bottom - PlayerSize);
+        // Clamp to screen edges (tiles cover full screen)
+        _playerPos.X = MathHelper.Clamp(_playerPos.X, PlayerSize, ScreenW - PlayerSize);
+        _playerPos.Y = MathHelper.Clamp(_playerPos.Y, PlayerSize, ScreenH - PlayerSize);
         
         // Scrolling camera — smooth follow for rooms larger than screen
         if (_arena.Height > ScreenH - 60) // room taller than screen
@@ -2905,6 +2905,12 @@ public class Game1 : Game
             float edge = PlayerSize; // transition triggers at arena edge
             int prevScreen = _currentScreen;
             
+            // Use screen edges for transitions (tiles cover full screen)
+            float transL = PlayerSize;           // left screen edge + margin
+            float transR = ScreenW - PlayerSize; // right screen edge - margin
+            float transT = PlayerSize;           // top screen edge + margin
+            float transB = ScreenH - PlayerSize; // bottom screen edge - margin
+            
             // Block screen transitions while inside Room 3 portal
             if (_inPortal || _portalTransitioning || _challengeActive) transitioned = true; // skip transition checks
 
@@ -2919,42 +2925,42 @@ public class Game1 : Game
             bool inDoorY = _playerPos.Y >= doorCYLocal - doorZone && _playerPos.Y <= doorCYLocal + doorZone;
             bool inDoorX = _playerPos.X >= doorCXLocal - doorZone && _playerPos.X <= doorCXLocal + doorZone;
 
-            if (!transitioned && _playerPos.X <= _arena.Left + edge && col > 0)
+            if (!transitioned && _playerPos.X <= transL && col > 0)
             {
-                if (!hasDoorW || !inDoorY || (_gameMode == GameMode.Awakening && IsAwakeningDoorLocked(_currentScreen, "W"))) { _playerPos.X = _arena.Left + edge + 1; }
+                if (!hasDoorW || !inDoorY || (_gameMode == GameMode.Awakening && IsAwakeningDoorLocked(_currentScreen, "W"))) { _playerPos.X = transL + 1; }
                 else {
                 _currentScreen--;
-                _playerPos.X = _arena.Right - edge * 2;
+                _playerPos.X = transR - edge;
                 _transitionDir = new Vector2(-ScreenW, 0);
                 transitioned = true;
                 }
             }
-            else if (!transitioned && _playerPos.X >= _arena.Right - edge && col < 2)
+            else if (!transitioned && _playerPos.X >= transR && col < 2)
             {
-                if (!hasDoorE || !inDoorY || (_gameMode == GameMode.Awakening && IsAwakeningDoorLocked(_currentScreen, "E"))) { _playerPos.X = _arena.Right - edge - 1; }
+                if (!hasDoorE || !inDoorY || (_gameMode == GameMode.Awakening && IsAwakeningDoorLocked(_currentScreen, "E"))) { _playerPos.X = transR - 1; }
                 else {
                 _currentScreen++;
-                _playerPos.X = _arena.Left + edge * 2;
+                _playerPos.X = transL + edge;
                 _transitionDir = new Vector2(ScreenW, 0);
                 transitioned = true;
                 }
             }
-            else if (!transitioned && _playerPos.Y <= _arena.Top + edge && row > 0)
+            else if (!transitioned && _playerPos.Y <= transT && row > 0)
             {
-                if (!hasDoorN || !inDoorX || (_gameMode == GameMode.Awakening && IsAwakeningDoorLocked(_currentScreen, "N"))) { _playerPos.Y = _arena.Top + edge + 1; }
+                if (!hasDoorN || !inDoorX || (_gameMode == GameMode.Awakening && IsAwakeningDoorLocked(_currentScreen, "N"))) { _playerPos.Y = transT + 1; }
                 else {
                 _currentScreen -= 3;
-                _playerPos.Y = _arena.Bottom - edge * 2;
+                _playerPos.Y = transB - edge;
                 _transitionDir = new Vector2(0, -ScreenH);
                 transitioned = true;
                 }
             }
-            else if (!transitioned && _playerPos.Y >= _arena.Bottom - edge && row < 3)
+            else if (!transitioned && _playerPos.Y >= transB && row < 3)
             {
-                if (!hasDoorS || !inDoorX || (_gameMode == GameMode.Awakening && IsAwakeningDoorLocked(_currentScreen, "S"))) { _playerPos.Y = _arena.Bottom - edge - 1; }
+                if (!hasDoorS || !inDoorX || (_gameMode == GameMode.Awakening && IsAwakeningDoorLocked(_currentScreen, "S"))) { _playerPos.Y = transB - 1; }
                 else {
                 _currentScreen += 3;
-                _playerPos.Y = _arena.Top + edge * 2;
+                _playerPos.Y = transT + edge;
                 _transitionDir = new Vector2(0, ScreenH);
                 transitioned = true;
                 }
@@ -3193,8 +3199,8 @@ public class Game1 : Game
 
 
 
-        _playerPos.X = MathHelper.Clamp(_playerPos.X, _arena.Left + PlayerSize / 2, _arena.Right - PlayerSize / 2);
-        _playerPos.Y = MathHelper.Clamp(_playerPos.Y, _arena.Top + PlayerSize / 2, _arena.Bottom - PlayerSize / 2);
+        _playerPos.X = MathHelper.Clamp(_playerPos.X, PlayerSize / 2, ScreenW - PlayerSize / 2);
+        _playerPos.Y = MathHelper.Clamp(_playerPos.Y, PlayerSize / 2, ScreenH - PlayerSize / 2);
 
         // Undine familiar update
         UpdateUndine(dt);
