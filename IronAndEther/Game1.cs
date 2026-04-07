@@ -4129,9 +4129,18 @@ public class Game1 : Game
                 {
                     var wall = pWalls[pwi];
                     if (!pRect.Intersects(wall)) continue;
-                    // Projectiles pass through one-way walls entirely
+                    // Projectiles pass through ledge walls only in the hop direction
                     int pow = (pOwList != null && pwi < pOwList.Count) ? pOwList[pwi] : 0;
-                    if (pow > 0) continue;
+                    if (pow > 0)
+                    {
+                        var vel = _projectiles[i].Velocity;
+                        bool passThrough = false;
+                        if (pow == 1 && vel.Y < 0) passThrough = true; // hop up, bullet going up
+                        if (pow == 2 && vel.Y > 0) passThrough = true; // hop down, bullet going down
+                        if (pow == 3 && vel.X < 0) passThrough = true; // hop left
+                        if (pow == 4 && vel.X > 0) passThrough = true; // hop right
+                        if (passThrough) continue;
+                    }
                     if (_projectiles[i].Params.Bounces && _projectiles[i].Params.MaxBounces > 0)
                     {
                         // Bounce off wall
@@ -26284,8 +26293,8 @@ public class Game1 : Game
             float sweepAngle = baseAngle + MathHelper.Lerp(-SwordArc / 2f, SwordArc / 2f, swingProgress);
             var srcRect = new Rectangle(0, 0, 16, 16);
             int drawSize = 48;
-            var origin = new Vector2(8, 14);
-            float dist = 20f;
+            var origin = new Vector2(8, 15); // pivot at base/hilt of sword
+            float dist = 8f; // close to player body
             float sx = pos.X + MathF.Cos(sweepAngle) * dist;
             float sy = pos.Y + MathF.Sin(sweepAngle) * dist - jumpHeight;
             float rot = sweepAngle + MathF.PI / 2f;
@@ -26295,8 +26304,8 @@ public class Game1 : Game
             {
                 float trailAngle = sweepAngle - (SwordArc / 8f) * t;
                 float trailAlpha = (1f - t / 4f) * 0.3f;
-                float tsx = pos.X + MathF.Cos(trailAngle) * dist;
-                float tsy = pos.Y + MathF.Sin(trailAngle) * dist - jumpHeight;
+                float tsx = pos.X + MathF.Cos(trailAngle) * 8f;
+                float tsy = pos.Y + MathF.Sin(trailAngle) * 8f - jumpHeight;
                 float trot = trailAngle + MathF.PI / 2f;
                 _spriteBatch.Draw(_swordTex, new Vector2(tsx, tsy), srcRect, Color.White * trailAlpha,
                     trot, origin, drawSize / 16f, Microsoft.Xna.Framework.Graphics.SpriteEffects.None, 0f);
