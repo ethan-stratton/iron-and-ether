@@ -10991,24 +10991,13 @@ public class Game1 : Game
     {
         // Don't re-init rooms that are already cleared
         _npcs.Clear();
-        if (_clearedScreens.Contains(screen))
-        {
-            // Still spawn persistent NPCs for cleared rooms
-            if (screen == 4) InitAwakeningRoom4Npcs();
-            // Room 8 lava is a permanent hazard
-            if (screen == 8) InitRoom8Lava();
-            return;
-        }
-        _sigils.Clear();
-        _sigilParticles.Clear();
-        _essenceCrystals.Clear();
-        _torches.Clear();
         
-        // Place torches per room — flanking doors, near points of interest
+        // ═══ Torches — always set up (persist across clears) ═══
+        _torches.Clear();
         int ax = _arena.Left, ay = _arena.Top, aw = _arena.Width, ah = _arena.Height;
         switch (screen)
         {
-            case 1: // Gauntlet — torches flanking the arena
+            case 1:
                 _torches.Add(new Vector2(ax + 60, ay + 60));
                 _torches.Add(new Vector2(ax + aw - 60, ay + 60));
                 _torches.Add(new Vector2(ax + 60, ay + ah - 60));
@@ -11060,6 +11049,17 @@ public class Game1 : Game
         
         // Auto-populate torches from painted tile data (overrides hardcoded if room has tile data)
         AddTorchesFromTiles(screen);
+        
+        // Early return for cleared rooms (torches already set up above)
+        if (_clearedScreens.Contains(screen))
+        {
+            if (screen == 4) InitAwakeningRoom4Npcs();
+            if (screen == 8) InitRoom8Lava();
+            return;
+        }
+        _sigils.Clear();
+        _sigilParticles.Clear();
+        _essenceCrystals.Clear();
         
         switch (screen)
         {
@@ -17600,9 +17600,12 @@ public class Game1 : Game
         InitScreenWalls();
     }
 
-    // Torch tile IDs (from OpenRPG tileset sheet 0 = dungeon)
-    // 264 = standalone torch, 265+293 = two-tile torch (top+bottom), 318 = wall torch, 381 = campfire
-    private static readonly HashSet<int> TorchTileIds = new() { 264, 265, 293, 318, 381 };
+    // Torch tile IDs — (sheet, tileId) pairs for light-emitting tiles
+    // Sheet 0 (dungeon): 264 = standalone torch, 293 = two-tile torch bottom, 318 = wall torch, 381 = campfire
+    private static readonly HashSet<(int sheet, int tile)> TorchTilePairs = new()
+    {
+        (0, 264), (0, 293), (0, 318), (0, 381)
+    };
     
     private void AddTorchesFromTiles(int room)
     {
@@ -17616,7 +17619,7 @@ public class Game1 : Game
                 for (int c = 0; c < cols; c++)
                 {
                     var (s, t) = layer[r, c];
-                    if (s >= 0 && TorchTileIds.Contains(t))
+                    if (s >= 0 && TorchTilePairs.Contains((s, t)))
                     {
                         // Place torch at center of tile cell
                         float tx = c * TSDst + TSDst / 2f;
