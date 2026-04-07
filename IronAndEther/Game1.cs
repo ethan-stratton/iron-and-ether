@@ -47,13 +47,22 @@ public class Game1 : Game
     // Layer 0 = background (floor), Layer 1 = foreground (walls/trees/overlays)
     private Dictionary<int, (int sheet, int tile)[,]> _roomTileData = new();
     private Dictionary<int, (int sheet, int tile)[,]> _roomTileOverlay = new();
-    private Dictionary<int, List<Rectangle>> _roomCollision = new(); // per-room collision rects
+    private Dictionary<int, List<CollRect>> _roomCollision = new(); // per-room collision rects
     private int _trActiveLayer = 0; // 0=background, 1=overlay
     private bool _trCollisionMode = false; // C key toggles collision editing
     private bool _trDraggingCollision = false;
     private Point _trCollDragStart;
     private int _trCollDragIdx = -1; // index of rect being resized, or -1 for new
     private int _trCollHoverIdx = -1; // which collision rect the mouse is over
+    private int _trLayerView = 0; // 0=both, 1=BG only, 2=FG only
+    
+    // OneWay: 0=solid, 1=pass from north, 2=pass from south, 3=pass from west, 4=pass from east
+    private struct CollRect
+    {
+        public Rectangle Rect;
+        public int OneWay; // 0=solid wall, 1-4=one-way (direction you CAN pass FROM)
+        public CollRect(Rectangle r, int oneWay = 0) { Rect = r; OneWay = oneWay; }
+    }
     private const int TileSrc = 12; // source tile size in tileset
     private const int TileScale = 3; // display scale
     private const int TileDst = TileSrc * TileScale; // 36px displayed
@@ -674,6 +683,7 @@ public class Game1 : Game
 
     // Walls per screen: screen number → list of solid rectangles (in arena-local coords)
     private Dictionary<int, List<Rectangle>> _screenWalls = new();
+    private Dictionary<int, List<int>> _screenWallOneWay = new(); // parallel to _screenWalls: 0=solid, 1-4=one-way
     
     // Campaign enemy storage: screen number → list of enemies (only active screen updates)
     private Dictionary<int, List<Enemy>> _screenEnemies = new();
@@ -2816,15 +2826,30 @@ public class Game1 : Game
         if (!_inCave && _screenWalls.TryGetValue(_currentScreen, out var walls))
         {
             var playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2), (int)PlayerSize, (int)PlayerSize);
-            foreach (var wall in walls)
+            _screenWallOneWay.TryGetValue(_currentScreen, out var owList);
+            for (int wi = 0; wi < walls.Count; wi++)
             {
+                var wall = walls[wi];
                 if (!playerRect.Intersects(wall)) continue;
+                int ow = (owList != null && wi < owList.Count) ? owList[wi] : 0;
+                
                 // Find minimum push-out direction
                 float pushLeft = playerRect.Right - wall.Left;
                 float pushRight = wall.Right - playerRect.Left;
                 float pushUp = playerRect.Bottom - wall.Top;
                 float pushDown = wall.Bottom - playerRect.Top;
                 float minPush = MathF.Min(MathF.Min(pushLeft, pushRight), MathF.Min(pushUp, pushDown));
+                
+                // One-way: skip push if player is passing from the allowed direction
+                // ow=1: can pass from north (player above, moving down) → skip pushUp
+                // ow=2: can pass from south → skip pushDown
+                // ow=3: can pass from west → skip pushLeft  
+                // ow=4: can pass from east → skip pushRight
+                if (ow == 1 && minPush == pushUp) continue;
+                if (ow == 2 && minPush == pushDown) continue;
+                if (ow == 3 && minPush == pushLeft) continue;
+                if (ow == 4 && minPush == pushRight) continue;
+                
                 if (minPush == pushLeft) _playerPos.X -= pushLeft;
                 else if (minPush == pushRight) _playerPos.X += pushRight;
                 else if (minPush == pushUp) _playerPos.Y -= pushUp;
@@ -4012,9 +4037,14 @@ public class Game1 : Game
                 && _screenWalls.TryGetValue(_currentScreen, out var pWalls))
             {
                 var pRect = _projectiles[i].HitBox;
-                foreach (var wall in pWalls)
+                _screenWallOneWay.TryGetValue(_currentScreen, out var pOwList);
+                for (int pwi = 0; pwi < pWalls.Count; pwi++)
                 {
+                    var wall = pWalls[pwi];
                     if (!pRect.Intersects(wall)) continue;
+                    // Projectiles pass through one-way walls entirely
+                    int pow = (pOwList != null && pwi < pOwList.Count) ? pOwList[pwi] : 0;
+                    if (pow > 0) continue;
                     if (_projectiles[i].Params.Bounces && _projectiles[i].Params.MaxBounces > 0)
                     {
                         // Bounce off wall
@@ -11148,6 +11178,7 @@ public class Game1 : Game
         // Torch near the knight
         _torches.Clear();
         _torches.Add(new Vector2(_arena.Left + 310, _arena.Top + 260));
+        AddTorchesFromTiles(4);
     }
     
     private void SpawnRoom4Sigils()
@@ -17778,13 +17809,17 @@ public class Game1 : Game
         foreach (var kvp in _roomCollision)
         {
             int room = kvp.Key;
-            if (room == 50) continue; // cave collision handled separately
+            if (room == 50) continue;
             if (!_screenWalls.ContainsKey(room))
                 _screenWalls[room] = new List<Rectangle>();
             else
-                _screenWalls[room].Clear(); // editor collision replaces hardcoded
-            foreach (var r in kvp.Value)
-                _screenWalls[room].Add(r); // collision coords are room-space (0,0 = screen top-left)
+                _screenWalls[room].Clear();
+            _screenWallOneWay[room] = new List<int>();
+            foreach (var cr in kvp.Value)
+            {
+                _screenWalls[room].Add(cr.Rect);
+                _screenWallOneWay[room].Add(cr.OneWay);
+            }
         }
     }
 
@@ -25240,7 +25275,7 @@ public class Game1 : Game
             if (_roomTileOverlay.TryGetValue(room, out var fg))
                 entry["fg"] = TileLayerToArray(fg);
             if (_roomCollision.TryGetValue(room, out var coll) && coll.Count > 0)
-                entry["collision"] = coll.Select(r => new int[] { r.X, r.Y, r.Width, r.Height }).ToArray();
+                entry["collision"] = coll.Select(cr => new int[] { cr.Rect.X, cr.Rect.Y, cr.Rect.Width, cr.Rect.Height, cr.OneWay }).ToArray();
             rooms[room.ToString()] = entry;
         }
         var wrapper = new Dictionary<string, object> { ["rooms"] = rooms };
@@ -25275,12 +25310,15 @@ public class Game1 : Game
                         _roomTileOverlay[roomNum] = ArrayToTileLayer(fgElem);
                     if (prop.Value.TryGetProperty("collision", out var collElem))
                     {
-                        var rects = new List<Rectangle>();
+                        var rects = new List<CollRect>();
                         foreach (var arr in collElem.EnumerateArray())
                         {
                             var vals = arr.EnumerateArray().Select(v => v.GetInt32()).ToArray();
                             if (vals.Length >= 4)
-                                rects.Add(new Rectangle(vals[0], vals[1], vals[2], vals[3]));
+                            {
+                                int ow = vals.Length >= 5 ? vals[4] : 0;
+                                rects.Add(new CollRect(new Rectangle(vals[0], vals[1], vals[2], vals[3]), ow));
+                            }
                         }
                         if (rects.Count > 0)
                             _roomCollision[roomNum] = rects;
@@ -25458,6 +25496,10 @@ public class Game1 : Game
             _trDraggingCollision = false;
         }
         
+        // V = cycle layer visibility: Both → BG only → FG only → Both
+        if (kb.IsKeyDown(Keys.V) && !_prevKb.IsKeyDown(Keys.V))
+            _trLayerView = (_trLayerView + 1) % 3;
+        
         // L = toggle layer (0=bg, 1=fg overlay)
         if (kb.IsKeyDown(Keys.L) && !_prevKb.IsKeyDown(Keys.L))
             _trActiveLayer = 1 - _trActiveLayer;
@@ -25545,7 +25587,7 @@ public class Game1 : Game
         if (_trCollisionMode && mouse.X >= palW)
         {
             if (!_roomCollision.ContainsKey(_trPaintRoom))
-                _roomCollision[_trPaintRoom] = new List<Rectangle>();
+                _roomCollision[_trPaintRoom] = new List<CollRect>();
             var collRects = _roomCollision[_trPaintRoom];
             
             // Mouse position in room-space (account for camera pan)
@@ -25575,7 +25617,14 @@ public class Game1 : Game
                 int h = y2 - y1;
                 if (w >= TSDst && h >= TSDst)
                 {
-                    collRects.Add(new Rectangle(x1, y1, w, h));
+                    // Hold arrow key while releasing to set one-way direction
+                    // Arrow = direction you CAN pass FROM (e.g. Up arrow = can fall off from above)
+                    int oneWay = 0;
+                    if (kb.IsKeyDown(Keys.Up)) oneWay = 1;
+                    else if (kb.IsKeyDown(Keys.Down)) oneWay = 2;
+                    else if (kb.IsKeyDown(Keys.Left)) oneWay = 3;
+                    else if (kb.IsKeyDown(Keys.Right)) oneWay = 4;
+                    collRects.Add(new CollRect(new Rectangle(x1, y1, w, h), oneWay));
                     SaveRoomTiles();
                 }
             }
@@ -25584,7 +25633,7 @@ public class Game1 : Game
             _trCollHoverIdx = -1;
             for (int i = collRects.Count - 1; i >= 0; i--)
             {
-                if (collRects[i].Contains(cmx, cmy))
+                if (collRects[i].Rect.Contains(cmx, cmy))
                 {
                     _trCollHoverIdx = i;
                     break;
@@ -25724,7 +25773,9 @@ public class Game1 : Game
                 // Cull off-screen
                 if (dx + TSDst < palW || dx > ScreenW || dy + TSDst < 50 || dy > ScreenH) continue;
                 
-                // Background layer
+                // Background layer (visible when _trLayerView == 0 or 1)
+                if (_trLayerView != 2)
+                {
                 var (s, t) = bgData[r, c];
                 if (s >= 0 && t >= 0 && _tsSheets[s] != null)
                 {
@@ -25738,8 +25789,11 @@ public class Game1 : Game
                 {
                     DrawRect(dx, dy, TSDst, TSDst, new Color(15, 15, 20));
                 }
+                }
                 
-                // Foreground/overlay layer (drawn on top, transparency shows through)
+                // Foreground/overlay layer (visible when _trLayerView == 0 or 2)
+                if (_trLayerView != 1)
+                {
                 var (s2, t2) = fgData[r, c];
                 if (s2 >= 0 && t2 >= 0 && _tsSheets[s2] != null)
                 {
@@ -25748,6 +25802,7 @@ public class Game1 : Game
                     int tc3 = t2 % sheetCols2;
                     var src2 = new Rectangle(tc3 * TS16, tr3 * TS16, TS16, TS16);
                     _spriteBatch.Draw(_tsSheets[s2], new Rectangle(dx, dy, TSDst, TSDst), src2, Color.White);
+                }
                 }
                 
                 // Grid lines (dimmer on inactive layer)
@@ -25877,9 +25932,12 @@ public class Game1 : Game
             {
                 for (int i = 0; i < drawColl.Count; i++)
                 {
-                    var r = drawColl[i];
+                    var cr = drawColl[i];
+                    var r = cr.Rect;
                     int rx = gridX + r.X, ry = gridY + r.Y;
-                    Color c = (i == _trCollHoverIdx && _trCollisionMode) ? Color.Red : new Color(255, 80, 80);
+                    bool isOneWay = cr.OneWay > 0;
+                    Color c = (i == _trCollHoverIdx && _trCollisionMode) ? Color.Red 
+                        : isOneWay ? new Color(80, 180, 255) : new Color(255, 80, 80);
                     float alpha = _trCollisionMode ? 0.4f : 0.2f;
                     DrawRect(rx, ry, r.Width, r.Height, c * alpha);
                     DrawRect(rx, ry, r.Width, 2, c * 0.8f);
@@ -25887,7 +25945,11 @@ public class Game1 : Game
                     DrawRect(rx, ry, 2, r.Height, c * 0.8f);
                     DrawRect(rx + r.Width - 2, ry, 2, r.Height, c * 0.8f);
                     if (_trCollisionMode)
-                        DrawTextFallback(rx + 4, ry + 4, $"{r.Width/TSDst}×{r.Height/TSDst}", Color.White * 0.6f, 0.5f);
+                    {
+                        string[] owLabels = { "", "↓ONE-WAY", "↑ONE-WAY", "→ONE-WAY", "←ONE-WAY" };
+                        string label = isOneWay ? owLabels[cr.OneWay] : $"{r.Width/TSDst}×{r.Height/TSDst}";
+                        DrawTextFallback(rx + 4, ry + 4, label, Color.White * 0.6f, 0.5f);
+                    }
                 }
             }
             
@@ -25959,14 +26021,15 @@ public class Game1 : Game
         // ── Header (fixed) ──
         DrawRect(0, 0, ScreenW, 50, new Color(15, 15, 20, 230));
         string layerStr = _trCollisionMode ? "COLLISION" : (_trActiveLayer == 0 ? "BG" : "FG");
+        string viewStr = _trLayerView == 0 ? "" : _trLayerView == 1 ? " [BG ONLY]" : " [FG ONLY]";
         string selStr = _trCollisionMode ? "Click+drag=add, Right-click=delete" : (_trSelectedTile >= 0 ? $"{_tsNames[_trSelectedSheet]}#{_trSelectedTile}" : "ERASER");
         string roomLabel = _trPaintRoom == 50 ? "5b (Cave)" : _trPaintRoom.ToString();
-        string header = $"PAINT — Room {roomLabel} ({roomCols}×{roomRows})  |  Mode: {layerStr}  |  {selStr}";
+        string header = $"PAINT — Room {roomLabel} ({roomCols}×{roomRows})  |  Mode: {layerStr}{viewStr}  |  {selStr}";
         Color headerColor = _trCollisionMode ? new Color(255, 100, 100) : new Color(200, 170, 100);
         DrawTextOutlined(10, 6, header, headerColor, Color.Black, 0.9f);
         string controls = _trCollisionMode 
             ? "WASD:pan  L/R:room  C:tiles  Click+drag:add wall  RClick:delete  Ctrl+S:save  ESC:back"
-            : "WASD:pan  L/R:room  TAB:sheet  L:layer  C:collision  Click:paint  RClick:erase  X:eraser  F:fill  G:overlay  Ctrl+S:save  ESC:back";
+            : "WASD:pan  L/R:room  TAB:sheet  L:layer  V:view  C:collision  Click:paint  RClick:erase  X:eraser  F:fill  G:overlay  Ctrl+S:save  ESC:back";
         DrawTextOutlined(10, 28, controls, new Color(100, 100, 120), Color.Black, 0.65f);
         
         _spriteBatch.End();
@@ -26107,6 +26170,25 @@ public class Game1 : Game
         DrawRect(shadowX + 2, groundY + 1, shadowW - 4, MathHelper.Max(shadowH - 1, 1), new Color(0, 0, 0, (int)(50 * shadowScale)));
         
         Color blk = Color.Black;
+        
+        // Simple rect player — shows exact collision size
+        int pw = (int)PlayerSize;
+        int ph = (int)PlayerSize;
+        int px = (int)(pos.X - pw / 2);
+        int py = (int)(pos.Y - ph / 2 - jumpHeight);
+        DrawRect(px, py, pw, ph, tint);
+        DrawRect(px, py, pw, 1, blk);
+        DrawRect(px, py + ph - 1, pw, 1, blk);
+        DrawRect(px, py, 1, ph, blk);
+        DrawRect(px + pw - 1, py, 1, ph, blk);
+        // Eyes (show facing direction)
+        int eyeX = aimDir.X >= 0 ? px + pw - 6 : px + 3;
+        int eyeY = py + 4;
+        DrawRect(eyeX, eyeY, 3, 3, Color.White);
+        DrawRect(eyeX + (aimDir.X >= 0 ? 1 : 0), eyeY + 1, 1, 1, blk);
+        return;
+        
+        /* ORIGINAL KNIGHT DESIGN — preserved for later
         Color ltGrey = Color.Lerp(new Color(190, 195, 200), tint, 0.3f);
         Color dkGrey = Color.Lerp(new Color(120, 125, 130), tint, 0.2f);
         Color visor = new Color(30, 30, 40);
@@ -26254,8 +26336,9 @@ public class Game1 : Game
             // Blade tip spark
             float tipX = pos.X + MathF.Cos(sweepAngle) * (SwordRange - 4);
             float tipY = pos.Y + MathF.Sin(sweepAngle) * (SwordRange - 4);
-            DrawRect((int)tipX - 1, (int)tipY - 1, 3, 3, Color.White * (0.8f - swingProgress * 0.6f));
+                        DrawRect((int)tipX - 1, (int)tipY - 1, 3, 3, Color.White * (0.8f - swingProgress * 0.6f));
         }
+        END OF ORIGINAL KNIGHT DESIGN */
     }
 
     private void DrawHUD()
