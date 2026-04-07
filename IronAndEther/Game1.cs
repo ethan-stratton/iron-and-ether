@@ -21411,7 +21411,7 @@ public class Game1 : Game
         if (!roomHasTiles)
             DrawRect(_arena.Left - 2, _arena.Top - 2, _arena.Width + 4, _arena.Height + 4, new Color(40, 40, 50));
         // Tiled floor (replaces flat color if tilesets loaded)
-        if (_tsDungeon != null)
+        if (_tsDungeon != null && !_inCave)
         {
             if (roomHasTiles)
                 DrawTiledFloor(new Rectangle(0, 0, ScreenW, _arena.Bottom + 80)); // full screen for painted rooms
@@ -21535,7 +21535,7 @@ public class Game1 : Game
             DrawPlayer(_playerPos + new Vector2(0, -_jumpHeight), aimDir, playerColor, (float)gameTime.TotalGameTime.TotalSeconds, essColor, _jumpHeight);
         
         // FG overlay tiles drawn AFTER player — tree canopies etc. obscure the player
-        DrawTiledFloorFG();
+        if (!_inCave) DrawTiledFloorFG();
 
         // Question mark when firing with empty loadout
         if (_questionMarkTimer > 0)
