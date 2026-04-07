@@ -2386,8 +2386,8 @@ public class Game1 : Game
             }
         }
 
-        // Post-processing shader hotkeys
-        if (kb.IsKeyDown(Keys.P) && !_prevKb.IsKeyDown(Keys.P))
+        // Post-processing shader hotkeys (disabled during Playing to avoid RT crash)
+        if (_state != GameState.Playing && _state != GameState.Paused && kb.IsKeyDown(Keys.P) && !_prevKb.IsKeyDown(Keys.P))
             _postProcessEnabled = !_postProcessEnabled;
         if (kb.IsKeyDown(Keys.Y) && !_prevKb.IsKeyDown(Keys.Y))
             _bloomIntensity = MathHelper.Clamp(_bloomIntensity - 0.05f, 0f, 1f);
@@ -24456,7 +24456,9 @@ public class Game1 : Game
             vigOffsetX = ((_playerPos.X - _cameraOffset.X) - 640f) * 0.3f; // 30% follow
             vigOffsetY = ((_playerPos.Y - _cameraOffset.Y) - 360f) * 0.3f;
         }
-        byte vigAlpha = (byte)MathHelper.Clamp(_vignetteStrength * 255, 0, 255);
+        // Vignette fades out at high ambient light (daytime) — full strength only at night
+        float vigScale = 1f - _ambientLight * 0.6f; // at ambient=1.0 (full day), vignette is 40% strength
+        byte vigAlpha = (byte)MathHelper.Clamp(_vignetteStrength * vigScale * 255, 0, 255);
         _spriteBatch.Begin(blendState: BlendState.AlphaBlend, samplerState: SamplerState.LinearClamp);
         _spriteBatch.Draw(_vignetteTexture, 
             new Rectangle((int)vigOffsetX - 100, (int)vigOffsetY - 100, 1280 + 200, 720 + 200), 
@@ -25677,12 +25679,13 @@ public class Game1 : Game
                 {
                     int dx = 0, dy = 0, dw = 0, dh = 0;
                     int doorSize = 100;
+                    // Doors at screen edges (transitions use screen bounds now)
                     switch (side)
                     {
-                        case "N": dx = oax + oaw / 2 - doorSize / 2; dy = oay - 6; dw = doorSize; dh = 6; break;
-                        case "S": dx = oax + oaw / 2 - doorSize / 2; dy = oay + oah; dw = doorSize; dh = 6; break;
-                        case "W": dx = oax - 6; dy = oay + oah / 2 - doorSize / 2; dw = 6; dh = doorSize; break;
-                        case "E": dx = oax + oaw; dy = oay + oah / 2 - doorSize / 2; dw = 6; dh = doorSize; break;
+                        case "N": dx = gridX + ScreenW / 2 - doorSize / 2; dy = gridY - 6; dw = doorSize; dh = 6; break;
+                        case "S": dx = gridX + ScreenW / 2 - doorSize / 2; dy = gridY + ScreenH; dw = doorSize; dh = 6; break;
+                        case "W": dx = gridX - 6; dy = gridY + ScreenH / 2 - doorSize / 2; dw = 6; dh = doorSize; break;
+                        case "E": dx = gridX + ScreenW; dy = gridY + ScreenH / 2 - doorSize / 2; dw = 6; dh = doorSize; break;
                     }
                     DrawRect(dx, dy, dw, dh, Color.Magenta * 0.7f);
                     DrawTextOutlined(dx, dy - 10, $"DOOR {side}", Color.Magenta * 0.8f, Color.Black, 0.5f);
@@ -26361,8 +26364,8 @@ public class Game1 : Game
         if (_testMode)
         {
             int px = _arena.Right - 280;
-            int py = _arena.Top + 10;
-            DrawRect(px - 5, py - 5, 275, 300, new Color(20, 20, 30));
+            int py = _arena.Top + 5;
+            DrawRect(px - 5, py - 5, 275, 360, new Color(20, 20, 30));
 
             DrawTextFallback(px, py, "=== TEST MODE (T to exit) ===", Color.Yellow);
             py += 18;
@@ -26411,7 +26414,9 @@ public class Game1 : Game
             py += 14;
             DrawTextOutlined(px, py, "LMB: Shoot  T: Exit test", new Color(100, 100, 100), Color.Black * 0.4f);
             py += 18;
-            DrawTextFallback(px, py, $"Bloom: {_bloomIntensity:F2} [Y/U]  Vignette: {_vignetteStrength:F2} [I/O]  PP: {(_postProcessEnabled ? "ON" : "OFF")} [P]  Shader: {(_shadersAvailable ? "YES" : "CPU")}", Color.Yellow, 0.6f);
+            DrawTextFallback(px, py, $"Bloom: {_bloomIntensity:F2} [Y/U]  Vignette: {_vignetteStrength:F2} [I/O]", Color.Yellow, 0.6f);
+            py += 14;
+            DrawTextFallback(px, py, $"PP: {(_postProcessEnabled ? "ON" : "OFF")} [P]  Shader: {(_shadersAvailable ? "YES" : "CPU")}", Color.Yellow, 0.6f);
             py += 18;
             
             // ═══ Ambient Light Slider ═══
