@@ -2287,7 +2287,7 @@ public class Game1 : Game
                 {
                     ry += 30; // past header
                     // Relic toggling
-                    bool[] relicOwned = { _ownsCaliburn, _ownsNimueTear, _ownsWandOfMerlin, _ownsTomeOfBinding, _ownsHasteBand, _ownsPhylactery, _ownsGrimoire, _ownsDragonDance, _ownsEtherSight, _ownsDamageNumbers, _ownsLambentAura, _ownsEtherRegen };
+                    bool[] relicOwned = { _ownsCaliburn, _ownsNimueTear, _ownsWandOfMerlin, _ownsTomeOfBinding, _ownsHasteBand, _ownsPhylactery, _ownsGrimoire, _ownsDragonDance, _ownsEtherSight, _ownsDamageNumbers, _ownsLambentAura, _ownsEtherRegen, _ownsQuickswap };
                     if (!clickConsumed)
                     {
                         for (int ri = 0; ri < relicOwned.Length; ri++)
@@ -2306,6 +2306,7 @@ public class Game1 : Game
                                 else if (ri == 9) _hasDamageNumbers = !_hasDamageNumbers;
                                 else if (ri == 10) _hasLambentAura = !_hasLambentAura;
                                 else if (ri == 11) { _hasEtherRegenRelic = !_hasEtherRegenRelic; _hasEtherRegen = _hasEtherRegenRelic; }
+                                else if (ri == 12) _hasQuickswap = !_hasQuickswap;
                                 clickConsumed = true;
                                 break;
                             }
@@ -20670,14 +20671,17 @@ public class Game1 : Game
     private int InvEssItemsY => InvEssLabelY + InvLabelH;
     
     // Secondary loadout section (below primary, extra gap)
-    private int InvSecHeaderY => InvEssItemsY + InvRowGap + 20;
-    private int InvSecFormY => InvSecHeaderY + InvLabelH + 4;
-    private int InvSecBehY => InvSecFormY + InvRowGap;
-    private int InvSecEssY => InvSecBehY + InvRowGap;
+    private int InvSecHeaderY => InvEssItemsY + 30;
+    private int InvSecFormLabelY => InvSecHeaderY + 24;
+    private int InvSecFormY => InvSecFormLabelY + 18;
+    private int InvSecBehLabelY => InvSecFormY + 24;
+    private int InvSecBehY => InvSecBehLabelY + 18;
+    private int InvSecEssLabelY => InvSecBehY + 24;
+    private int InvSecEssY => InvSecEssLabelY + 18;
     
     // Utility essence section
-    private int InvUtilLabelY => InvSecEssY + InvRowGap + 16;
-    private int InvUtilItemsY => InvUtilLabelY + InvLabelH;
+    private int InvUtilLabelY => InvSecEssY + 30;
+    private int InvUtilItemsY => InvUtilLabelY + 22;
 
     private void RefreshCombo()
     {
@@ -26674,8 +26678,8 @@ public class Game1 : Game
         DrawTextFallback(cardX + 8, (int)activeY + 4, "Q", activeAccent * 0.5f, 0.7f);
         DrawTextFallback(cardX + 22, (int)activeY + 4, activeComboName, Color.White, 1.1f);
         // Essence color dot — outside card to the right
-        DrawRect(cardX + cardW + 6, (int)activeY + 10, 14, 14, activeEssCol);
-        DrawRect(cardX + cardW + 7, (int)activeY + 11, 12, 12, activeEssCol * 0.6f);
+        DrawRect(cardX + cardW + 10, (int)activeY + 10, 14, 14, activeEssCol);
+        DrawRect(cardX + cardW + 11, (int)activeY + 11, 12, 12, activeEssCol * 0.6f);
         
         var parms = activeParms;
         var essenceColor = activeEssCol;
@@ -26683,7 +26687,7 @@ public class Game1 : Game
         // Utility essence — right of combo card + dot
         string utilName = _utilityEssence == Essence.None ? "---" : _utilityEssence.ToString();
         Color utilColor = _utilityEssence == Essence.None ? Color.Gray : GetEssenceColor(_utilityEssence);
-        int utilX = cardX + cardW + 30;
+        int utilX = cardX + cardW + 34;
         DrawRect(utilX, hudY, 100, cardH, new Color(20, 25, 20));
         DrawRect(utilX, hudY, 100, 2, new Color(60, 220, 160) * 0.6f);
         DrawTextFallback(utilX + 4, hudY + 4, "E", new Color(60, 220, 160) * 0.5f, 0.7f);
@@ -26694,10 +26698,10 @@ public class Game1 : Game
         
         // Stats line below active card
         string statsLine = $"DMG:{parms.BaseDamage:F0}  SPD:{parms.Speed:F0}  FR:{parms.FireRate:F2}s";
-        DrawTextFallback(cardX + 8, (int)activeY + cardH + 4, statsLine, Color.Gray * 0.6f, 0.7f);
+        DrawTextFallback(cardX + 8, (int)activeY + cardH + 8, statsLine, Color.Gray * 0.6f, 0.7f);
         
         if (_gameMode != GameMode.Awakening)
-            DrawTextFallback(cardX + 8, (int)activeY + cardH + 16, $"Wave {_wave}  Kills {_killCount}/{_waveKillTarget}", Color.Gray * 0.5f, 0.7f);
+            DrawTextFallback(cardX + 8, (int)activeY + cardH + 20, $"Wave {_wave}  Kills {_killCount}/{_waveKillTarget}", Color.Gray * 0.5f, 0.7f);
 
         // Fusion/combo name above arena
         if (_currentFusion != null && _fusionFlashTimer > 0)
@@ -26776,7 +26780,7 @@ public class Game1 : Game
         int hpBarW = 200;
         DrawRect(hpBarX, hpBarY, hpBarW, 10, new Color(60, 20, 20));
         DrawRect(hpBarX, hpBarY, (int)(hpBarW * (_playerHp / PlayerMaxHp)), 10, new Color(200, 50, 50));
-        DrawTextFallback(hpBarX - 60, hpBarY - 1, $"HP {_playerHp:F0}", Color.White);
+        DrawTextFallback(hpBarX - 75, hpBarY - 1, $"HP {_playerHp:F0}", Color.White);
         
         // Mana bar — below HP bar (juiced)
         int etherBarY = hpBarY + 14;
@@ -26829,7 +26833,7 @@ public class Game1 : Game
         
         // Label
         Color epLabelCol = etherLow ? Color.Lerp(new Color(100, 150, 255), new Color(255, 80, 80), 0.5f + etherPulse) : new Color(100, 150, 255);
-        DrawTextFallback(hpBarX - 60, etherBarY - 1, $"EP {_playerEther:F0}", epLabelCol);
+        DrawTextFallback(hpBarX - 75, etherBarY - 1, $"EP {_playerEther:F0}", epLabelCol);
         
         // Ether shard counter — below mana bar
         DrawTextFallback(hpBarX, etherBarY + 14, $"Ether Crystals: {_hardEther}", new Color(200, 180, 255));
@@ -27180,7 +27184,7 @@ public class Game1 : Game
                 DrawTextFallback(cx, InvSecHeaderY, "SECONDARY LOADOUT [Q]", new Color(100, 200, 255) * alpha, 1.1f);
                 
                 // Secondary Form
-                DrawTextFallback(cx, InvSecFormY - InvLabelH, "FORM", new Color(200, 80, 80) * alpha * 0.7f);
+                DrawTextFallback(cx, InvSecFormLabelY, "FORM", new Color(200, 80, 80) * alpha * 0.7f);
                 fx = cx + InvItemIndent;
                 foreach (var f in _unlockedForms)
                 {
@@ -27195,7 +27199,7 @@ public class Game1 : Game
                 }
                 
                 // Secondary Behavior
-                DrawTextFallback(cx, InvSecBehY - InvLabelH, "BEHAVIOR", new Color(80, 200, 80) * alpha * 0.7f);
+                DrawTextFallback(cx, InvSecBehLabelY, "BEHAVIOR", new Color(80, 200, 80) * alpha * 0.7f);
                 fx = cx + InvItemIndent;
                 foreach (var b in _unlockedBehaviors)
                 {
@@ -27210,7 +27214,7 @@ public class Game1 : Game
                 }
                 
                 // Secondary Essence
-                DrawTextFallback(cx, InvSecEssY - InvLabelH, "ESSENCE", essCol * 0.7f);
+                DrawTextFallback(cx, InvSecEssLabelY, "ESSENCE", essCol * 0.7f);
                 fx = cx + InvItemIndent;
                 foreach (var e in _unlockedEssences)
                 {
@@ -27256,12 +27260,12 @@ public class Game1 : Game
                 int ry = panelY + 20;
                 
                 // Relic symbol lookup
-                string[] relicSymbols = { "◆", "◇", "☆", "⊕", "»", "◈", "✦", "⚔", "◉", "▣", "☀", "∞" };
-                string[] invRelicNames = { "Caliburn Shard", "Nimue's Tear", "Wand of Merlin", "Tome of Binding", "Haste Band", "Merlin's Phylactery", "Grimoire", "Dragon Dance", "Ether Sight", "Arcane Numbers", "Lambent Aura", "Wellspring Heart" };
-                bool[] invRelicOwned = { _ownsCaliburn, _ownsNimueTear, _ownsWandOfMerlin, _ownsTomeOfBinding, _ownsHasteBand, _ownsPhylactery, _ownsGrimoire, _ownsDragonDance, _ownsEtherSight, _ownsDamageNumbers, _ownsLambentAura, _ownsEtherRegen };
-                bool[] invRelicActive = { _hasCaliburn, _hasNimueTear, _hasWandOfMerlin, _hasTomeOfBinding, _hasHasteBand, _hasPhylactery, _hasGrimoire, _hasDragonDance, _hasEtherSight, _hasDamageNumbers, _hasLambentAura, _hasEtherRegenRelic };
-                string[] invRelicDescs = { "Projectiles pierce one enemy", "Drain HP on hit", "Hold RMB to charge shots", "Unlocks Dual Combos", "Increased movement speed", "Max ether increased 25%", "Unlocks Spell Fusions", "+10% dmg/speed per kill", "Reveals WEAKNESS, RESIST, and BREAK", "Shows damage numbers on hit", "Emit a lambent glow that illuminates the dark", "Ether regenerates passively over time" };
-                Color[] relicColors = { new Color(200, 180, 120), new Color(100, 180, 220), new Color(160, 120, 200), new Color(180, 140, 100), new Color(120, 200, 120), new Color(140, 100, 200), new Color(200, 160, 60), new Color(220, 80, 60), new Color(160, 200, 255), new Color(200, 180, 255), new Color(255, 230, 140), new Color(80, 200, 180) };
+                string[] relicSymbols = { "◆", "◇", "☆", "⊕", "»", "◈", "✦", "⚔", "◉", "▣", "☀", "∞", "⟲" };
+                string[] invRelicNames = { "Caliburn Shard", "Nimue's Tear", "Wand of Merlin", "Tome of Binding", "Haste Band", "Merlin's Phylactery", "Grimoire", "Dragon Dance", "Ether Sight", "Arcane Numbers", "Lambent Aura", "Wellspring Heart", "Quickswap Charm" };
+                bool[] invRelicOwned = { _ownsCaliburn, _ownsNimueTear, _ownsWandOfMerlin, _ownsTomeOfBinding, _ownsHasteBand, _ownsPhylactery, _ownsGrimoire, _ownsDragonDance, _ownsEtherSight, _ownsDamageNumbers, _ownsLambentAura, _ownsEtherRegen, _ownsQuickswap };
+                bool[] invRelicActive = { _hasCaliburn, _hasNimueTear, _hasWandOfMerlin, _hasTomeOfBinding, _hasHasteBand, _hasPhylactery, _hasGrimoire, _hasDragonDance, _hasEtherSight, _hasDamageNumbers, _hasLambentAura, _hasEtherRegenRelic, _hasQuickswap };
+                string[] invRelicDescs = { "Projectiles pierce one enemy", "Drain HP on hit", "Hold RMB to charge shots", "Unlocks Dual Combos", "Increased movement speed", "Max ether increased 25%", "Unlocks Spell Fusions", "+10% dmg/speed per kill", "Reveals WEAKNESS, RESIST, and BREAK", "Shows damage numbers on hit", "Emit a lambent glow that illuminates the dark", "Ether regenerates passively over time", "Enables secondary loadout (Q to swap)" };
+                Color[] relicColors = { new Color(200, 180, 120), new Color(100, 180, 220), new Color(160, 120, 200), new Color(180, 140, 100), new Color(120, 200, 120), new Color(140, 100, 200), new Color(200, 160, 60), new Color(220, 80, 60), new Color(160, 200, 255), new Color(200, 180, 255), new Color(255, 230, 140), new Color(80, 200, 180), new Color(100, 200, 255) };
                 
                 // RELICS header button
                 {
