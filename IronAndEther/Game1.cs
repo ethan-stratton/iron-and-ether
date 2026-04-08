@@ -3017,6 +3017,11 @@ public class Game1 : Game
             // Visual jump arc (shadow stays, player hops up then down)
             _jumpHeight = MathF.Sin(t2 * MathF.PI) * 45f; // 45px peak arc
             _isJumping = true; // suppress normal jump
+            // Rapid walk cycle during hop (ALttP style)
+            _walkAnimTimer += dt * 16f; // ~4x normal speed
+            if (_walkAnimTimer >= 4f) _walkAnimTimer -= 4f;
+            int hopRaw = (int)_walkAnimTimer;
+            _walkFrame = hopRaw < 3 ? hopRaw : 4 - hopRaw;
             if (t2 >= 1f)
             {
                 _ledgeHopping = false;
