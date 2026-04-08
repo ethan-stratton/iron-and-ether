@@ -3080,10 +3080,10 @@ public class Game1 : Game
                     if (isHorizontal)
                     {
                         // Horizontal ledge: check if player X overlaps wall X range
-                        // Line sits at the contact edge:
-                        // ow=1 (hop up): player below, line at BOTTOM of rect
-                        // ow=2 (hop down): player above, line at TOP of rect
-                        linePos = (ow == 1) ? wall.Bottom : wall.Top;
+                        // Line sits at the cliff edge (where player contacts):
+                        // ow=1 (hop up): cliff at TOP of rect
+                        // ow=2 (hop down): cliff at BOTTOM of rect
+                        linePos = (ow == 1) ? wall.Top : wall.Bottom;
                         overlapsLine = playerRect.Right > wall.Left && playerRect.Left < wall.Right;
                         halfSize = PlayerHitboxH / 2f;
                         playerCenter = _playerPos.Y + PlayerHitboxOffsetY;
@@ -3095,9 +3095,9 @@ public class Game1 : Game
                     else
                     {
                         // Vertical ledge: check if player Y overlaps wall Y range
-                        // ow=3 (hop left): player right, line at RIGHT of rect
-                        // ow=4 (hop right): player left, line at LEFT of rect
-                        linePos = (ow == 3) ? wall.Right : wall.Left;
+                        // ow=3 (hop left): cliff at LEFT of rect
+                        // ow=4 (hop right): cliff at RIGHT of rect
+                        linePos = (ow == 3) ? wall.Left : wall.Right;
                         overlapsLine = playerRect.Bottom > wall.Top && playerRect.Top < wall.Bottom;
                         halfSize = PlayerSize / 2f;
                         playerCenter = _playerPos.X;
@@ -21972,12 +21972,12 @@ public class Game1 : Game
                         // Ledge: draw as a thick line on the edge
                         if (dow <= 2) // horizontal ledge
                         {
-                            int ly = (dow == 1) ? dw.Y + dw.Height - 1 : dw.Y;
+                            int ly = (dow == 1) ? dw.Y : dw.Y + dw.Height - 1;
                             DrawRect(dw.X, ly - 1, dw.Width, 3, dc);
                         }
                         else // vertical ledge
                         {
-                            int lx = (dow == 3) ? dw.X + dw.Width - 1 : dw.X;
+                            int lx = (dow == 3) ? dw.X : dw.X + dw.Width - 1;
                             DrawRect(lx - 1, dw.Y, 3, dw.Height, dc);
                         }
                         string[] arrows = { "", "↑", "↓", "←", "→" };
