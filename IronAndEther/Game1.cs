@@ -57,12 +57,12 @@ public class Game1 : Game
     private int _trCollHoverIdx = -1; // which collision rect the mouse is over
     private int _trLayerView = 0; // 0=both, 1=BG only, 2=FG only
     
-    // OneWay: 0=solid, 1=ledge hop up, 2=ledge hop down, 3=ledge hop left, 4=ledge hop right
+    // OneWay: 0=solid, 1-4=ledge hop, 5=player-only (bullets pass through)
     // Ledge lines are zero-thickness edges — only block movement perpendicular to the line
     private struct CollRect
     {
         public Rectangle Rect;
-        public int OneWay; // 0=solid wall, 1-4=ledge direction (zero-thickness edge, hop in arrow dir)
+        public int OneWay; // 0=solid, 1-4=ledge, 5=player-only
         public CollRect(Rectangle r, int oneWay = 0) { Rect = r; OneWay = oneWay; }
     }
     private const int TileSrc = 12; // source tile size in tileset
@@ -3078,7 +3078,7 @@ public class Game1 : Game
                 // ow direction = direction player CAN hop THROUGH
                 // ow=1: hop up, ow=2: hop down, ow=3: hop left, ow=4: hop right
                 // Ledge lines: zero-thickness edges, only block perpendicular movement
-                if (ow > 0 && !_ledgeHopping)
+                if (ow >= 1 && ow <= 4 && !_ledgeHopping)
                 {
                     bool isHorizontal = (ow <= 2); // 1=hop up, 2=hop down → horizontal line
                     float linePos, playerMin, playerMax, playerCenter, halfSize;
@@ -3158,21 +3158,18 @@ public class Game1 : Game
                         _ledgeHoldDir = 0;
                     }
                     
-                    // Push out only along the perpendicular axis
+                    // Push out only along the perpendicular axis (+1px buffer to prevent jitter)
                     _pushingWall = true;
                     if (isHorizontal)
                     {
-                        // Push player so they no longer cross the line
                         if (_playerPos.Y + PlayerHitboxOffsetY > linePos)
                         {
-                            // Player center is below line → push down so top edge clears
-                            float fix = linePos - playerRect.Top;
+                            float fix = linePos - playerRect.Top + 1f;
                             if (fix > 0) _playerPos.Y += fix;
                         }
                         else
                         {
-                            // Player center is above line → push up so bottom edge clears
-                            float fix = playerRect.Bottom - linePos;
+                            float fix = playerRect.Bottom - linePos + 1f;
                             if (fix > 0) _playerPos.Y -= fix;
                         }
                     }
@@ -3180,12 +3177,12 @@ public class Game1 : Game
                     {
                         if (_playerPos.X > linePos)
                         {
-                            float fix = linePos - playerRect.Left;
+                            float fix = linePos - playerRect.Left + 1f;
                             if (fix > 0) _playerPos.X += fix;
                         }
                         else
                         {
-                            float fix = playerRect.Right - linePos;
+                            float fix = playerRect.Right - linePos + 1f;
                             if (fix > 0) _playerPos.X -= fix;
                         }
                     }
@@ -4388,7 +4385,8 @@ public class Game1 : Game
                     if (!pRect.Intersects(wall)) continue;
                     // Projectiles pass through ledge walls only in the hop direction
                     int pow = (pOwList != null && pwi < pOwList.Count) ? pOwList[pwi] : 0;
-                    if (pow > 0)
+                    if (pow == 5) continue; // player-only wall, bullets pass through
+                    if (pow > 0 && pow <= 4)
                     {
                         var vel = _projectiles[i].Velocity;
                         bool passThrough = false;
@@ -21980,8 +21978,8 @@ public class Game1 : Game
                 {
                     var dw = dbgWalls[di];
                     int dow = (dbgOw != null && di < dbgOw.Count) ? dbgOw[di] : 0;
-                    Color dc = dow > 0 ? Color.CornflowerBlue : Color.Red;
-                    if (dow > 0)
+                    Color dc = (dow >= 1 && dow <= 4) ? Color.CornflowerBlue : (dow == 5 ? Color.Orange : Color.Red);
+                    if (dow >= 1 && dow <= 4)
                     {
                         // Ledge: draw as a thick line on the edge
                         if (dow <= 2) // horizontal ledge
@@ -26113,6 +26111,7 @@ public class Game1 : Game
                     else if (kb.IsKeyDown(Keys.Down)) oneWay = 2;
                     else if (kb.IsKeyDown(Keys.Left)) oneWay = 3;
                     else if (kb.IsKeyDown(Keys.Right)) oneWay = 4;
+                    else if (kb.IsKeyDown(Keys.Space)) oneWay = 5; // player-only wall (bullets pass)
                     collRects.Add(new CollRect(new Rectangle(x1, y1, w, h), oneWay));
                     SaveRoomTiles();
                 }
@@ -26424,9 +26423,10 @@ public class Game1 : Game
                     var cr = drawColl[i];
                     var r = cr.Rect;
                     int rx = gridX + r.X, ry = gridY + r.Y;
-                    bool isOneWay = cr.OneWay > 0;
+                    bool isOneWay = cr.OneWay >= 1 && cr.OneWay <= 4;
+                    bool isPlayerOnly = cr.OneWay == 5;
                     Color c = (i == _trCollHoverIdx && _trCollisionMode) ? Color.Red 
-                        : isOneWay ? new Color(80, 180, 255) : new Color(255, 80, 80);
+                        : isPlayerOnly ? new Color(255, 165, 0) : isOneWay ? new Color(80, 180, 255) : new Color(255, 80, 80);
                     float alpha = _trCollisionMode ? 0.4f : 0.2f;
                     DrawRect(rx, ry, r.Width, r.Height, c * alpha);
                     DrawRect(rx, ry, r.Width, 2, c * 0.8f);
@@ -26435,8 +26435,8 @@ public class Game1 : Game
                     DrawRect(rx + r.Width - 2, ry, 2, r.Height, c * 0.8f);
                     if (_trCollisionMode)
                     {
-                        string[] owLabels = { "", "↑HOP UP", "↓HOP DOWN", "←HOP LEFT", "→HOP RIGHT" };
-                        string label = isOneWay ? owLabels[cr.OneWay] : $"{r.Width/TSDst}×{r.Height/TSDst}";
+                        string[] owLabels = { "", "↑HOP UP", "↓HOP DOWN", "←HOP LEFT", "→HOP RIGHT", "PLAYER ONLY" };
+                        string label = (cr.OneWay > 0 && cr.OneWay <= 5) ? owLabels[cr.OneWay] : $"{r.Width/TSDst}×{r.Height/TSDst}";
                         DrawTextFallback(rx + 4, ry + 4, label, Color.White * 0.6f, 0.5f);
                     }
                 }
@@ -26537,7 +26537,7 @@ public class Game1 : Game
         DrawRect(0, 0, ScreenW, 50, new Color(15, 15, 20, 230));
         string layerStr = _trCollisionMode ? "COLLISION" : (_trActiveLayer == 0 ? "BG" : "FG");
         string viewStr = _trLayerView == 0 ? "" : _trLayerView == 1 ? " [BG ONLY]" : " [FG ONLY]";
-        string selStr = _trCollisionMode ? "Drag=add, RClick=del, Shift=half-tile, Arrows=ledge" : (_trSelectedTile >= 0 ? $"{_tsNames[_trSelectedSheet]}#{_trSelectedTile}" : "ERASER");
+        string selStr = _trCollisionMode ? "Drag=add, RClick=del, Shift=half, Arrows=ledge, Space=player-only" : (_trSelectedTile >= 0 ? $"{_tsNames[_trSelectedSheet]}#{_trSelectedTile}" : "ERASER");
         string roomLabel = _trPaintRoom == 50 ? "5b (Cave)" : _trPaintRoom.ToString();
         string header = $"PAINT — Room {roomLabel} ({roomCols}×{roomRows})  |  Mode: {layerStr}{viewStr}  |  {selStr}";
         Color headerColor = _trCollisionMode ? new Color(255, 100, 100) : new Color(200, 170, 100);
