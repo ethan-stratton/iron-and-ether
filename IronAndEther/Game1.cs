@@ -231,14 +231,14 @@ public class Game1 : Game
     private bool _isJumping = false;
     private float _jumpVelocity = 0f;
     private float _jumpHeight = 0f; // current visual offset (positive = higher)
-    private const float JumpStrength = 210f;
+    private const float JumpStrength = 140f;
     private const float JumpGravity = 700f;
     // Ledge hop (ALttP one-way wall)
     private bool _ledgeHopping = false;
     private float _ledgeHopTimer = 0f;
     private Vector2 _ledgeHopTarget;
     private Vector2 _ledgeHopStart;
-    private const float LedgeHopDuration = 0.35f; // time to complete hop
+    private const float LedgeHopDuration = 0.55f; // time to complete hop
     private const float LedgeHopHoldTime = 0.3f; // hold time before hop triggers
     private float _ledgeHoldTimer = 0f; // how long player has been pushing into one-way wall
     private int _ledgeHoldDir = 0; // which one-way direction is being held into
@@ -712,6 +712,7 @@ public class Game1 : Game
     private Vector2 _playerPos;
     private const float PlayerSpeed = 250f;
     private const float PlayerSize = 20f;
+    private const float PlayerHitboxH = 40f; // doubled height for better sprite coverage
     private float _playerHp = 100f;
     private int _timesFallen = 0;
     private const float PlayerMaxHp = 100f;
@@ -2833,7 +2834,7 @@ public class Game1 : Game
             // Shield-dash opens ShieldDash doors on contact
             if (_gameMode == GameMode.Awakening)
             {
-                var dashRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
+                var dashRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
                 int dax = _arena.Left, day = _arena.Top, daw = _arena.Width, dah = _arena.Height;
                 for (int di = 0; di < _doors.Count; di++)
                 {
@@ -3014,7 +3015,7 @@ public class Game1 : Game
             float smoothT = t2 * t2 * (3f - 2f * t2); // smoothstep
             _playerPos = Vector2.Lerp(_ledgeHopStart, _ledgeHopTarget, smoothT);
             // Visual jump arc (shadow stays, player hops up then down)
-            _jumpHeight = MathF.Sin(t2 * MathF.PI) * 30f; // 30px peak
+            _jumpHeight = MathF.Sin(t2 * MathF.PI) * 45f; // 45px peak arc
             _isJumping = true; // suppress normal jump
             if (t2 >= 1f)
             {
@@ -3038,7 +3039,7 @@ public class Game1 : Game
         _pushingWall = false;
         if (!_inCave && !_ledgeHopping && _screenWalls.TryGetValue(_currentScreen, out var walls))
         {
-            var playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
+            var playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
             _screenWallOneWay.TryGetValue(_currentScreen, out var owList);
             for (int wi = 0; wi < walls.Count; wi++)
             {
@@ -3107,7 +3108,7 @@ public class Game1 : Game
                     if (ow == 3) { if (minPush == pushLeft) { _playerPos.X -= pushLeft; blocked = true; } }   // block from east
                     if (ow == 4) { if (minPush == pushRight) { _playerPos.X += pushRight; blocked = true; } } // block from west
                     if (blocked)
-                        playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
+                        playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
                     continue;
                 }
                 
@@ -3116,14 +3117,14 @@ public class Game1 : Game
                 else if (minPush == pushRight) _playerPos.X += pushRight;
                 else if (minPush == pushUp) _playerPos.Y -= pushUp;
                 else _playerPos.Y += pushDown;
-                playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
+                playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
             }
         }
         
         // Pedestal collision (pickups have solid pedestals)
         if (_gameMode == GameMode.Awakening)
         {
-            var playerRect2 = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
+            var playerRect2 = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
             foreach (var p in _pickups)
             {
                 // Only collide if in correct context (cave for wand/wandofmerlin)
@@ -3139,7 +3140,7 @@ public class Game1 : Game
                 else if (minPush == pushRight) _playerPos.X += pushRight;
                 else if (minPush == pushUp) _playerPos.Y -= pushUp;
                 else _playerPos.Y += pushDown;
-                playerRect2 = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
+                playerRect2 = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
             }
             
             // Locked door collision
@@ -3165,13 +3166,13 @@ public class Game1 : Game
                 else if (mp == pR) _playerPos.X += pR;
                 else if (mp == pU) _playerPos.Y -= pU;
                 else _playerPos.Y += pD;
-                playerRect2 = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
+                playerRect2 = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
             }
         }
         
         // Player hedge collision (solid, no buff)
         {
-            var pRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
+            var pRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
             foreach (var hedge in _hedgeWalls)
             {
                 if (hedge.GrowTimer > 0) continue;
@@ -3185,7 +3186,7 @@ public class Game1 : Game
                 else if (minPush == pushRight) _playerPos.X += pushRight;
                 else if (minPush == pushUp) _playerPos.Y -= pushUp;
                 else _playerPos.Y += pushDown;
-                pRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
+                pRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
             }
         }
         
@@ -13946,7 +13947,7 @@ public class Game1 : Game
         {
             // Expand collision by 6px (coast border visual extends into lava zone)
             const int lavaPad = 6;
-            var playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
+            var playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
             foreach (var lr in _lavaRects)
             {
                 var padded = new Rectangle(lr.X - lavaPad, lr.Y - lavaPad, lr.Width + lavaPad * 2, lr.Height + lavaPad * 2);
@@ -13986,7 +13987,7 @@ public class Game1 : Game
                 else if (minPush == pushRight) _playerPos.X += pushRight;
                 else if (minPush == pushUp) _playerPos.Y -= pushUp;
                 else _playerPos.Y += pushDown;
-                playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
+                playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
             }
         }
         
@@ -21880,12 +21881,13 @@ public class Game1 : Game
         {
             // Player collision box (green)
             int phbX = (int)(_playerPos.X - PlayerSize / 2);
-            int phbY = (int)(_playerPos.Y - PlayerSize / 2 + PlayerHitboxOffsetY);
+            int phbY = (int)(_playerPos.Y - PlayerHitboxH / 2 + PlayerHitboxOffsetY);
             int phbS = (int)PlayerSize;
+            int phbH = (int)PlayerHitboxH;
             DrawRect(phbX, phbY, phbS, 1, Color.Lime);
-            DrawRect(phbX, phbY + phbS - 1, phbS, 1, Color.Lime);
-            DrawRect(phbX, phbY, 1, phbS, Color.Lime);
-            DrawRect(phbX + phbS - 1, phbY, 1, phbS, Color.Lime);
+            DrawRect(phbX, phbY + phbH - 1, phbS, 1, Color.Lime);
+            DrawRect(phbX, phbY, 1, phbH, Color.Lime);
+            DrawRect(phbX + phbS - 1, phbY, 1, phbH, Color.Lime);
             // Center dot
             DrawRect((int)_playerPos.X - 1, (int)_playerPos.Y - 1, 3, 3, Color.Lime);
             
