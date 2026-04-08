@@ -57,11 +57,12 @@ public class Game1 : Game
     private int _trCollHoverIdx = -1; // which collision rect the mouse is over
     private int _trLayerView = 0; // 0=both, 1=BG only, 2=FG only
     
-    // OneWay: 0=solid, 1=pass from north, 2=pass from south, 3=pass from west, 4=pass from east
+    // OneWay: 0=solid, 1=ledge hop up, 2=ledge hop down, 3=ledge hop left, 4=ledge hop right
+    // Ledge lines are SOLID walls that allow a hop animation in one direction after holding 0.3s
     private struct CollRect
     {
         public Rectangle Rect;
-        public int OneWay; // 0=solid wall, 1-4=one-way (direction you CAN pass FROM)
+        public int OneWay; // 0=solid wall, 1-4=ledge direction (blocks both ways, hop in arrow dir)
         public CollRect(Rectangle r, int oneWay = 0) { Rect = r; OneWay = oneWay; }
     }
     private const int TileSrc = 12; // source tile size in tileset
@@ -3070,12 +3071,13 @@ public class Game1 : Game
                 // Player is blocked normally; holding into the wall triggers a ledge hop
                 if (ow > 0 && !_ledgeHopping)
                 {
-                    // Check if player is holding movement in the hop direction
+                    // Ledge walls are SOLID — block from all directions
+                    // But holding into them in the hop direction triggers a hop over
                     bool pushing = false;
-                    if (ow == 1 && kb.IsKeyDown(Keys.W)) pushing = true; // hop up
-                    if (ow == 2 && kb.IsKeyDown(Keys.S)) pushing = true; // hop down
-                    if (ow == 3 && kb.IsKeyDown(Keys.A)) pushing = true; // hop left
-                    if (ow == 4 && kb.IsKeyDown(Keys.D)) pushing = true; // hop right
+                    if (ow == 1 && kb.IsKeyDown(Keys.W) && minPush == pushDown) pushing = true; // hop up, player below
+                    if (ow == 2 && kb.IsKeyDown(Keys.S) && minPush == pushUp) pushing = true;   // hop down, player above
+                    if (ow == 3 && kb.IsKeyDown(Keys.A) && minPush == pushRight) pushing = true; // hop left, player right
+                    if (ow == 4 && kb.IsKeyDown(Keys.D) && minPush == pushLeft) pushing = true;  // hop right, player left
                     
                     if (pushing && _ledgeHoldDir == ow)
                     {
@@ -3098,22 +3100,17 @@ public class Game1 : Game
                             continue; // skip push-out, hop will handle movement
                         }
                     }
+                    else if (pushing)
+                    {
+                        _ledgeHoldTimer = 0f;
+                        _ledgeHoldDir = ow;
+                    }
                     else
                     {
                         _ledgeHoldTimer = 0f;
-                        _ledgeHoldDir = pushing ? ow : 0;
+                        _ledgeHoldDir = 0;
                     }
-                    // If pushing into wall in hop direction, don't block — let hold timer accumulate
-                    if (pushing) continue;
-                    // One-way walls block movement from the WRONG direction
-                    bool blocked = false;
-                    if (ow == 1) { if (minPush == pushUp) { _playerPos.Y -= pushUp; blocked = true; } }      // block from south
-                    if (ow == 2) { if (minPush == pushDown) { _playerPos.Y += pushDown; blocked = true; } }   // block from north
-                    if (ow == 3) { if (minPush == pushLeft) { _playerPos.X -= pushLeft; blocked = true; } }   // block from east
-                    if (ow == 4) { if (minPush == pushRight) { _playerPos.X += pushRight; blocked = true; } } // block from west
-                    if (blocked)
-                        playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
-                    continue;
+                    // Fall through to normal solid wall push-out below
                 }
                 
                 _pushingWall = true;
