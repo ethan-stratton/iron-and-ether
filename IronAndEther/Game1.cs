@@ -26629,7 +26629,7 @@ public class Game1 : Game
             var srcRect = new Rectangle(srcX, srcY, KF_W, KF_H);
             float scale = 2.5f; // 26×36 → 65×90 display
             var origin = new Vector2(KF_W / 2f, KF_H - 4f); // anchor at feet
-            var drawPos = new Vector2(pos.X, pos.Y + PlayerSize / 2f + 6f); // +6 to lower sprite
+            var drawPos = new Vector2(pos.X, pos.Y + PlayerSize / 2f + 14f); // +14 to lower sprite
             
             // Hit flash
             Color spriteTint = tint;
