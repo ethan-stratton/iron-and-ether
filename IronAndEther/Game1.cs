@@ -3103,10 +3103,9 @@ public class Game1 : Game
                         _ledgeHoldTimer = 0f;
                         _ledgeHoldDir = pushing ? ow : 0;
                     }
+                    // If pushing into wall in hop direction, don't block — let hold timer accumulate
+                    if (pushing) continue;
                     // One-way walls block movement from the WRONG direction
-                    // ow=1 (hop up): block from below (can't walk up through)
-                    // ow=2 (hop down): block from below (can't walk up through) — wait, reversed:
-                    // ow=2 (hop down): player hops downward, so block upward movement (pushUp)
                     bool blocked = false;
                     if (ow == 1) { if (minPush == pushUp) { _playerPos.Y -= pushUp; blocked = true; } }      // block from south
                     if (ow == 2) { if (minPush == pushDown) { _playerPos.Y += pushDown; blocked = true; } }   // block from north
