@@ -3080,8 +3080,13 @@ public class Game1 : Game
                     if (isHorizontal)
                     {
                         // Horizontal ledge: check if player X overlaps wall X range
-                        // Line sits at CENTER of rect — top half blocks hop side, bottom half blocks return
-                        linePos = wall.Top + wall.Height / 2f;
+                        // Half-tile ledge (≤24px tall): line at bottom/top edge
+                        // Full-tile+ ledge (>24px): line at center between the two halves
+                        bool isHalfTile = wall.Height <= 24;
+                        if (isHalfTile)
+                            linePos = (ow == 1) ? wall.Top : wall.Bottom;
+                        else
+                            linePos = wall.Top + wall.Height / 2f;
                         overlapsLine = playerRect.Right > wall.Left && playerRect.Left < wall.Right;
                         halfSize = PlayerHitboxH / 2f;
                         playerCenter = _playerPos.Y + PlayerHitboxOffsetY;
@@ -3093,7 +3098,11 @@ public class Game1 : Game
                     else
                     {
                         // Vertical ledge: check if player Y overlaps wall Y range
-                        linePos = wall.Left + wall.Width / 2f;
+                        bool isHalfTileV = wall.Width <= 24;
+                        if (isHalfTileV)
+                            linePos = (ow == 3) ? wall.Left : wall.Right;
+                        else
+                            linePos = wall.Left + wall.Width / 2f;
                         overlapsLine = playerRect.Bottom > wall.Top && playerRect.Top < wall.Bottom;
                         halfSize = PlayerSize / 2f;
                         playerCenter = _playerPos.X;
@@ -21966,14 +21975,18 @@ public class Game1 : Game
                     if (dow > 0)
                     {
                         // Ledge: draw as a thick line on the edge
-                        if (dow <= 2) // horizontal ledge — line at center
+                        if (dow <= 2) // horizontal ledge
                         {
-                            int ly = dw.Y + dw.Height / 2;
+                            int ly = (dw.Height <= 24)
+                                ? ((dow == 1) ? dw.Y : dw.Y + dw.Height - 1)
+                                : dw.Y + dw.Height / 2;
                             DrawRect(dw.X, ly - 1, dw.Width, 3, dc);
                         }
-                        else // vertical ledge — line at center
+                        else // vertical ledge
                         {
-                            int lx = dw.X + dw.Width / 2;
+                            int lx = (dw.Width <= 24)
+                                ? ((dow == 3) ? dw.X : dw.X + dw.Width - 1)
+                                : dw.X + dw.Width / 2;
                             DrawRect(lx - 1, dw.Y, 3, dw.Height, dc);
                         }
                         string[] arrows = { "", "↑", "↓", "←", "→" };
