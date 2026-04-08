@@ -857,6 +857,11 @@ public class Game1 : Game
     private bool _pushingWall = false; // player is pressing against a solid wall
     private float _pushTimer = 0f;
     private const float PlayerHitboxOffsetY = 15f; // hitbox shifted down from sprite center
+    // Wall push emotes
+    private float _wallPushTime = 0f; // how long player has been pushing into a blocking wall
+    private const float EmoteScribbleTime = 1.0f; // seconds before scribble appears
+    private const float EmoteAngerTime = 3.0f; // seconds before anger symbol
+    private float _angerPulse = 0f; // animation timer for anger symbol dilation
     private bool _hasSword = false;
     private float _swordTimer;         // counts down during swing
     private float _swordCooldown;      // cooldown between swings
@@ -2945,10 +2950,14 @@ public class Game1 : Game
             {
                 _pushTimer += dt;
                 _walkFrame = 1; // freeze on standing frame (push pose)
+                _wallPushTime += dt;
+                _angerPulse += dt;
             }
             else
             {
                 _pushTimer = 0f;
+                _wallPushTime = 0f;
+                _angerPulse = 0f;
             }
         }
         
@@ -22012,7 +22021,50 @@ public class Game1 : Game
         {
             float qAlpha = MathHelper.Clamp(_questionMarkTimer / 0.3f, 0f, 1f);
             float qBob = MathF.Sin(_questionMarkTimer * 8f) * 2f;
-            DrawTextFallback((int)_playerPos.X - 3, (int)(_playerPos.Y - _jumpHeight) - 30 + (int)qBob, "?", Color.Yellow * qAlpha);
+            DrawTextFallback((int)_playerPos.X - 3, (int)(_playerPos.Y - _jumpHeight) - 50 + (int)qBob, "?", Color.Yellow * qAlpha);
+        }
+
+        // Wall push emotes
+        if (_wallPushTime > 0)
+        {
+            int emoteX = (int)_playerPos.X;
+            int emoteY = (int)(_playerPos.Y - _jumpHeight) - 55;
+            
+            if (_wallPushTime >= EmoteAngerTime)
+            {
+                // Anger symbol: ✕ shape that dilates and retracts
+                float pulse = 1f + MathF.Sin(_angerPulse * 6f) * 0.3f; // 0.7-1.3 scale
+                int sz = (int)(6 * pulse);
+                Color angerCol = new Color(220, 50, 50);
+                float alpha = MathHelper.Clamp((_wallPushTime - EmoteAngerTime) / 0.3f, 0f, 1f);
+                // Draw cross/hash shape (manga anger vein)
+                DrawRect(emoteX - sz, emoteY - 1, sz * 2, 2, angerCol * alpha);
+                DrawRect(emoteX - 1, emoteY - sz, 2, sz * 2, angerCol * alpha);
+                // Diagonal lines
+                for (int d = -sz; d <= sz; d++)
+                {
+                    DrawRect(emoteX + d, emoteY + d, 2, 2, angerCol * alpha * 0.7f);
+                    DrawRect(emoteX + d, emoteY - d, 2, 2, angerCol * alpha * 0.7f);
+                }
+            }
+            else if (_wallPushTime >= EmoteScribbleTime)
+            {
+                // Scribble circle: animated wobbly ring
+                float alpha = MathHelper.Clamp((_wallPushTime - EmoteScribbleTime) / 0.3f, 0f, 1f);
+                Color scribCol = new Color(200, 200, 200) * alpha;
+                float radius = 7f;
+                float phase = _wallPushTime * 12f;
+                int segments = 16;
+                for (int s = 0; s < segments; s++)
+                {
+                    float a = (s / (float)segments) * MathF.PI * 2f;
+                    float wobble = MathF.Sin(a * 3f + phase) * 2f;
+                    float r = radius + wobble;
+                    int px = emoteX + (int)(MathF.Cos(a) * r);
+                    int py = emoteY + (int)(MathF.Sin(a) * r);
+                    DrawRect(px, py, 2, 2, scribCol);
+                }
+            }
         }
 
         // Undine familiar
