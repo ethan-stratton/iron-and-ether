@@ -231,7 +231,7 @@ public class Game1 : Game
     private bool _isJumping = false;
     private float _jumpVelocity = 0f;
     private float _jumpHeight = 0f; // current visual offset (positive = higher)
-    private const float JumpStrength = 140f;
+    private const float JumpStrength = 210f;
     private const float JumpGravity = 700f;
     // Ledge hop (ALttP one-way wall)
     private bool _ledgeHopping = false;
@@ -854,6 +854,7 @@ public class Game1 : Game
     private bool _showHitboxes = false; // H debug toggle (test mode)
     private bool _pushingWall = false; // player is pressing against a solid wall
     private float _pushTimer = 0f;
+    private const float PlayerHitboxOffsetY = 15f; // hitbox shifted down from sprite center
     private bool _hasSword = false;
     private float _swordTimer;         // counts down during swing
     private float _swordCooldown;      // cooldown between swings
@@ -2832,7 +2833,7 @@ public class Game1 : Game
             // Shield-dash opens ShieldDash doors on contact
             if (_gameMode == GameMode.Awakening)
             {
-                var dashRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2), (int)PlayerSize, (int)PlayerSize);
+                var dashRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
                 int dax = _arena.Left, day = _arena.Top, daw = _arena.Width, dah = _arena.Height;
                 for (int di = 0; di < _doors.Count; di++)
                 {
@@ -3037,7 +3038,7 @@ public class Game1 : Game
         _pushingWall = false;
         if (!_inCave && !_ledgeHopping && _screenWalls.TryGetValue(_currentScreen, out var walls))
         {
-            var playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2), (int)PlayerSize, (int)PlayerSize);
+            var playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
             _screenWallOneWay.TryGetValue(_currentScreen, out var owList);
             for (int wi = 0; wi < walls.Count; wi++)
             {
@@ -3106,7 +3107,7 @@ public class Game1 : Game
                     if (ow == 3) { if (minPush == pushLeft) { _playerPos.X -= pushLeft; blocked = true; } }   // block from east
                     if (ow == 4) { if (minPush == pushRight) { _playerPos.X += pushRight; blocked = true; } } // block from west
                     if (blocked)
-                        playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2), (int)PlayerSize, (int)PlayerSize);
+                        playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
                     continue;
                 }
                 
@@ -3115,14 +3116,14 @@ public class Game1 : Game
                 else if (minPush == pushRight) _playerPos.X += pushRight;
                 else if (minPush == pushUp) _playerPos.Y -= pushUp;
                 else _playerPos.Y += pushDown;
-                playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2), (int)PlayerSize, (int)PlayerSize);
+                playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
             }
         }
         
         // Pedestal collision (pickups have solid pedestals)
         if (_gameMode == GameMode.Awakening)
         {
-            var playerRect2 = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2), (int)PlayerSize, (int)PlayerSize);
+            var playerRect2 = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
             foreach (var p in _pickups)
             {
                 // Only collide if in correct context (cave for wand/wandofmerlin)
@@ -3138,7 +3139,7 @@ public class Game1 : Game
                 else if (minPush == pushRight) _playerPos.X += pushRight;
                 else if (minPush == pushUp) _playerPos.Y -= pushUp;
                 else _playerPos.Y += pushDown;
-                playerRect2 = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2), (int)PlayerSize, (int)PlayerSize);
+                playerRect2 = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
             }
             
             // Locked door collision
@@ -3164,13 +3165,13 @@ public class Game1 : Game
                 else if (mp == pR) _playerPos.X += pR;
                 else if (mp == pU) _playerPos.Y -= pU;
                 else _playerPos.Y += pD;
-                playerRect2 = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2), (int)PlayerSize, (int)PlayerSize);
+                playerRect2 = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
             }
         }
         
         // Player hedge collision (solid, no buff)
         {
-            var pRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2), (int)PlayerSize, (int)PlayerSize);
+            var pRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
             foreach (var hedge in _hedgeWalls)
             {
                 if (hedge.GrowTimer > 0) continue;
@@ -3184,7 +3185,7 @@ public class Game1 : Game
                 else if (minPush == pushRight) _playerPos.X += pushRight;
                 else if (minPush == pushUp) _playerPos.Y -= pushUp;
                 else _playerPos.Y += pushDown;
-                pRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2), (int)PlayerSize, (int)PlayerSize);
+                pRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
             }
         }
         
@@ -11693,25 +11694,46 @@ public class Game1 : Game
             Color bodyCol = npc.HitFlashTimer > 0 ? Color.White : npc.BodyColor;
             Color accentCol = npc.HitFlashTimer > 0 ? Color.White : npc.AccentColor;
             
-            // Feet / boots
-            DrawRect(x - 6, y + 8, 5, 6, new Color(60, 50, 40));
-            DrawRect(x + 1, y + 8, 5, 6, new Color(60, 50, 40));
-            
-            // Body / armor
-            DrawRect(x - 8, y - 10, 16, 20, bodyCol);
-            DrawRect(x - 6, y - 8, 12, 3, bodyCol * 1.2f);
-            
-            // Pauldrons
-            DrawRect(x - 10, y - 10, 4, 6, accentCol);
-            DrawRect(x + 6, y - 10, 4, 6, accentCol);
-            
-            // Head / helm
-            DrawRect(x - 5, y - 18, 10, 9, bodyCol);
-            DrawRect(x - 3, y - 14, 6, 2, new Color(30, 30, 40));
-            DrawRect(x - 1, y - 21, 2, 4, accentCol);
-            
-            // Belt
-            DrawRect(x - 7, y, 14, 2, accentCol);
+            // Sprite-based NPC knight (1st knight from sheet, columns 0-2)
+            if (_playerTex != null)
+            {
+                int npcCol = 0; // 1st knight
+                int npcFrame = 1; // standing frame (middle)
+                int npcFacing = 0; // facing down (toward player)
+                // Face player
+                var toPlayer = _playerPos - npc.Position;
+                if (MathF.Abs(toPlayer.X) > MathF.Abs(toPlayer.Y))
+                    npcFacing = toPlayer.X < 0 ? 1 : 2;
+                else
+                    npcFacing = toPlayer.Y < 0 ? 3 : 0;
+                int srcX = (npcCol + npcFrame) * KF_W;
+                int srcY = npcFacing * KF_H;
+                var srcRect = new Rectangle(srcX, srcY, KF_W, KF_H);
+                float scale = 2.5f;
+                var origin = new Vector2(KF_W / 2f, KF_H - 4f);
+                Color spriteTint = npc.HitFlashTimer > 0 ? Color.White : Color.White;
+                _spriteBatch.Draw(_playerTex, new Vector2(x, y + 14f), srcRect, spriteTint,
+                    0f, origin, scale, Microsoft.Xna.Framework.Graphics.SpriteEffects.None, 0f);
+            }
+            else
+            {
+                // Fallback rect knight
+                // Feet / boots
+                DrawRect(x - 6, y + 8, 5, 6, new Color(60, 50, 40));
+                DrawRect(x + 1, y + 8, 5, 6, new Color(60, 50, 40));
+                // Body / armor
+                DrawRect(x - 8, y - 10, 16, 20, bodyCol);
+                DrawRect(x - 6, y - 8, 12, 3, bodyCol * 1.2f);
+                // Pauldrons
+                DrawRect(x - 10, y - 10, 4, 6, accentCol);
+                DrawRect(x + 6, y - 10, 4, 6, accentCol);
+                // Head / helm
+                DrawRect(x - 5, y - 18, 10, 9, bodyCol);
+                DrawRect(x - 3, y - 14, 6, 2, new Color(30, 30, 40));
+                DrawRect(x - 1, y - 21, 2, 4, accentCol);
+                // Belt
+                DrawRect(x - 7, y, 14, 2, accentCol);
+            }
             
             // Health bar (only show if damaged)
             if (npc.Hp < npc.MaxHp)
@@ -13924,7 +13946,7 @@ public class Game1 : Game
         {
             // Expand collision by 6px (coast border visual extends into lava zone)
             const int lavaPad = 6;
-            var playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2), (int)PlayerSize, (int)PlayerSize);
+            var playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
             foreach (var lr in _lavaRects)
             {
                 var padded = new Rectangle(lr.X - lavaPad, lr.Y - lavaPad, lr.Width + lavaPad * 2, lr.Height + lavaPad * 2);
@@ -13964,7 +13986,7 @@ public class Game1 : Game
                 else if (minPush == pushRight) _playerPos.X += pushRight;
                 else if (minPush == pushUp) _playerPos.Y -= pushUp;
                 else _playerPos.Y += pushDown;
-                playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2), (int)PlayerSize, (int)PlayerSize);
+                playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerSize/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerSize);
             }
         }
         
@@ -21858,7 +21880,7 @@ public class Game1 : Game
         {
             // Player collision box (green)
             int phbX = (int)(_playerPos.X - PlayerSize / 2);
-            int phbY = (int)(_playerPos.Y - PlayerSize / 2);
+            int phbY = (int)(_playerPos.Y - PlayerSize / 2 + PlayerHitboxOffsetY);
             int phbS = (int)PlayerSize;
             DrawRect(phbX, phbY, phbS, 1, Color.Lime);
             DrawRect(phbX, phbY + phbS - 1, phbS, 1, Color.Lime);
