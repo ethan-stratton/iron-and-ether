@@ -3054,6 +3054,9 @@ public class Game1 : Game
         _pushingWall = false;
         if (!_inCave && !_ledgeHopping && _screenWalls.TryGetValue(_currentScreen, out var walls))
         {
+            // Run collision twice to resolve multi-wall jitter
+            for (int pass = 0; pass < 2; pass++)
+            {
             var playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
             _screenWallOneWay.TryGetValue(_currentScreen, out var owList);
             for (int wi = 0; wi < walls.Count; wi++)
@@ -3164,12 +3167,12 @@ public class Game1 : Game
                     {
                         if (_playerPos.Y + PlayerHitboxOffsetY > linePos)
                         {
-                            float fix = linePos - playerRect.Top + 1f;
+                            float fix = linePos - playerRect.Top + 0.5f;
                             if (fix > 0) _playerPos.Y += fix;
                         }
                         else
                         {
-                            float fix = playerRect.Bottom - linePos + 1f;
+                            float fix = playerRect.Bottom - linePos + 0.5f;
                             if (fix > 0) _playerPos.Y -= fix;
                         }
                     }
@@ -3177,12 +3180,12 @@ public class Game1 : Game
                     {
                         if (_playerPos.X > linePos)
                         {
-                            float fix = linePos - playerRect.Left + 1f;
+                            float fix = linePos - playerRect.Left + 0.5f;
                             if (fix > 0) _playerPos.X += fix;
                         }
                         else
                         {
-                            float fix = playerRect.Right - linePos + 1f;
+                            float fix = playerRect.Right - linePos + 0.5f;
                             if (fix > 0) _playerPos.X -= fix;
                         }
                     }
@@ -3197,6 +3200,7 @@ public class Game1 : Game
                 else _playerPos.Y += pushDown;
                 playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
             }
+            } // end collision pass
         }
         
         // Pedestal collision (pickups have solid pedestals)
