@@ -48,14 +48,15 @@ public class Game1 : Game
     // Layer 0 = background (floor), Layer 1 = foreground (walls/trees/overlays)
     private Dictionary<int, (int sheet, int tile)[,]> _roomTileData = new();
     private Dictionary<int, (int sheet, int tile)[,]> _roomTileOverlay = new();
+    private Dictionary<int, (int sheet, int tile)[,]> _roomTileMid = new();
     private Dictionary<int, List<CollRect>> _roomCollision = new(); // per-room collision rects
-    private int _trActiveLayer = 0; // 0=background, 1=overlay
+    private int _trActiveLayer = 0; // 0=background, 1=mid, 2=overlay
     private bool _trCollisionMode = false; // C key toggles collision editing
     private bool _trDraggingCollision = false;
     private Point _trCollDragStart;
     private int _trCollDragIdx = -1; // index of rect being resized, or -1 for new
     private int _trCollHoverIdx = -1; // which collision rect the mouse is over
-    private int _trLayerView = 0; // 0=both, 1=BG only, 2=FG only
+    private int _trLayerView = 0; // 0=all, 1=BG only, 2=MID only, 3=FG only
     
     // OneWay: 0=solid, 1-4=ledge hop, 5=player-only (bullets pass through)
     // Ledge lines are zero-thickness edges — only block movement perpendicular to the line
@@ -17462,7 +17463,7 @@ public class Game1 : Game
     private void DrawTiledFloor(Rectangle area)
     {
         // Check for painted room data first
-        bool hasPainted = _roomTileData.ContainsKey(_currentScreen) || _roomTileOverlay.ContainsKey(_currentScreen);
+        bool hasPainted = _roomTileData.ContainsKey(_currentScreen) || _roomTileMid.ContainsKey(_currentScreen) || _roomTileOverlay.ContainsKey(_currentScreen);
         if (hasPainted)
         {
             var (roomCols, roomRows) = GetRoomTileSize(_currentScreen);
@@ -17541,6 +17542,25 @@ public class Game1 : Game
         }
     }
 
+    private void DrawTiledFloorMid()
+    {
+        if (!_roomTileMid.TryGetValue(_currentScreen, out var mid)) return;
+        var (roomCols, roomRows) = GetRoomTileSize(_currentScreen);
+        for (int r = 0; r < Math.Min(roomRows, mid.GetLength(0)); r++)
+        {
+            for (int c = 0; c < Math.Min(roomCols, mid.GetLength(1)); c++)
+            {
+                var (s, t) = mid[r, c];
+                if (s < 0 || t < 0 || _tsSheets[s] == null) continue;
+                int dx = c * TSDst;
+                int dy = r * TSDst;
+                int sheetCols = _tsSheets[s].Width / TS16;
+                var src = new Rectangle((t % sheetCols) * TS16, (t / sheetCols) * TS16, TS16, TS16);
+                _spriteBatch.Draw(_tsSheets[s], new Rectangle(dx, dy, TSDst, TSDst), src, Color.White);
+            }
+        }
+    }
+    
     private void DrawTiledFloorFG()
     {
         if (!_roomTileOverlay.TryGetValue(_currentScreen, out var fg)) return;
@@ -18088,17 +18108,19 @@ public class Game1 : Game
         }
         
         // Only add from tiles if the room has painted tile data
-        bool hasTiles = _roomTileData.ContainsKey(room) || _roomTileOverlay.ContainsKey(room);
+        bool hasTiles = _roomTileData.ContainsKey(room) || _roomTileMid.ContainsKey(room) || _roomTileOverlay.ContainsKey(room);
         if (!hasTiles) return;
         
         // Clear hardcoded torches — tile data takes over
         _torches.Clear();
         
         _roomTileData.TryGetValue(room, out var bg);
+        _roomTileMid.TryGetValue(room, out var mid);
         _roomTileOverlay.TryGetValue(room, out var fg);
         ScanLayer(bg);
+        ScanLayer(mid);
         ScanLayer(fg);
-        System.Console.WriteLine($"AddTorchesFromTiles room={room}: hasBG={bg!=null} hasFG={fg!=null} torchCount={_torches.Count}");
+        System.Console.WriteLine($"AddTorchesFromTiles room={room}: hasBG={bg!=null} hasMID={mid!=null} hasFG={fg!=null} torchCount={_torches.Count}");
     }
     
     private void InitScreenWalls()
@@ -21850,7 +21872,7 @@ public class Game1 : Game
             int pad = 200;
             DrawRect(_arena.Left - pad, _arena.Top - pad, _arena.Width + pad * 2, _arena.Height + pad * 2, new Color(10, 10, 15));
         }
-        bool roomHasTiles = _roomTileData.ContainsKey(_currentScreen) || _roomTileOverlay.ContainsKey(_currentScreen);
+        bool roomHasTiles = _roomTileData.ContainsKey(_currentScreen) || _roomTileMid.ContainsKey(_currentScreen) || _roomTileOverlay.ContainsKey(_currentScreen);
         if (!roomHasTiles)
             DrawRect(_arena.Left - 2, _arena.Top - 2, _arena.Width + 4, _arena.Height + 4, new Color(40, 40, 50));
         // Tiled floor (replaces flat color if tilesets loaded)
@@ -21860,6 +21882,8 @@ public class Game1 : Game
                 DrawTiledFloor(new Rectangle(0, 0, ScreenW, _arena.Bottom + 80)); // full screen for painted rooms
             else
                 DrawTiledFloor(_arena); // just arena for auto-tiled
+            // Mid layer — above floor, below player
+            if (!_inCave) DrawTiledFloorMid();
         }
         else
             DrawRect(_arena.Left, _arena.Top, _arena.Width, _arena.Height, new Color(15, 15, 20));
@@ -25725,6 +25749,19 @@ public class Game1 : Game
         return _roomTileOverlay[room];
     }
     
+    private (int sheet, int tile)[,] GetOrCreateRoomMid(int room)
+    {
+        if (!_roomTileMid.ContainsKey(room))
+        {
+            var data = new (int sheet, int tile)[TSRoomRows, TSRoomCols];
+            for (int r = 0; r < TSRoomRows; r++)
+                for (int c = 0; c < TSRoomCols; c++)
+                    data[r, c] = (-1, -1);
+            _roomTileMid[room] = data;
+        }
+        return _roomTileMid[room];
+    }
+    
     private int?[][] TileLayerToArray((int sheet, int tile)[,] data)
     {
         int rows = data.GetLength(0);
@@ -25771,6 +25808,7 @@ public class Game1 : Game
         // Save as {"rooms":{"5":{"bg":[...],"fg":[...],"collision":[[x,y,w,h],...]}, ...}}
         var rooms = new Dictionary<string, Dictionary<string, object>>();
         var allRooms = new HashSet<int>(_roomTileData.Keys);
+        foreach (var k in _roomTileMid.Keys) allRooms.Add(k);
         foreach (var k in _roomTileOverlay.Keys) allRooms.Add(k);
         foreach (var k in _roomCollision.Keys) allRooms.Add(k);
         
@@ -25779,6 +25817,8 @@ public class Game1 : Game
             var entry = new Dictionary<string, object>();
             if (_roomTileData.TryGetValue(room, out var bg))
                 entry["bg"] = TileLayerToArray(bg);
+            if (_roomTileMid.TryGetValue(room, out var mid))
+                entry["mid"] = TileLayerToArray(mid);
             if (_roomTileOverlay.TryGetValue(room, out var fg))
                 entry["fg"] = TileLayerToArray(fg);
             if (_roomCollision.TryGetValue(room, out var coll) && coll.Count > 0)
@@ -25802,6 +25842,7 @@ public class Game1 : Game
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
             _roomTileData.Clear();
+            _roomTileMid.Clear();
             _roomTileOverlay.Clear();
             _roomCollision.Clear();
             
@@ -25813,6 +25854,8 @@ public class Game1 : Game
                     int roomNum = int.Parse(prop.Name);
                     if (prop.Value.TryGetProperty("bg", out var bgElem))
                         _roomTileData[roomNum] = ArrayToTileLayer(bgElem);
+                    if (prop.Value.TryGetProperty("mid", out var midElem))
+                        _roomTileMid[roomNum] = ArrayToTileLayer(midElem);
                     if (prop.Value.TryGetProperty("fg", out var fgElem))
                         _roomTileOverlay[roomNum] = ArrayToTileLayer(fgElem);
                     if (prop.Value.TryGetProperty("collision", out var collElem))
@@ -25841,7 +25884,7 @@ public class Game1 : Game
                     _roomTileData[roomNum] = ArrayToTileLayer(prop.Value);
                 }
             }
-            System.Console.WriteLine($"Loaded room tiles ({_roomTileData.Count} bg, {_roomTileOverlay.Count} fg rooms)");
+            System.Console.WriteLine($"Loaded room tiles ({_roomTileData.Count} bg, {_roomTileMid.Count} mid, {_roomTileOverlay.Count} fg rooms)");
         }
         catch (Exception ex)
         {
@@ -26004,11 +26047,11 @@ public class Game1 : Game
         
         // V = cycle layer visibility: Both → BG only → FG only → Both
         if (kb.IsKeyDown(Keys.V) && !_prevKb.IsKeyDown(Keys.V))
-            _trLayerView = (_trLayerView + 1) % 3;
+            _trLayerView = (_trLayerView + 1) % 4;
         
-        // L = toggle layer (0=bg, 1=fg overlay)
+        // L = toggle layer (0=bg, 1=mid, 2=fg overlay)
         if (kb.IsKeyDown(Keys.L) && !_prevKb.IsKeyDown(Keys.L))
-            _trActiveLayer = 1 - _trActiveLayer;
+            _trActiveLayer = (_trActiveLayer + 1) % 3;
         
         // Ctrl+S to save
         if (kb.IsKeyDown(Keys.LeftControl) && kb.IsKeyDown(Keys.S) && !_prevKb.IsKeyDown(Keys.S))
@@ -26017,7 +26060,7 @@ public class Game1 : Game
         // F to fill entire room with selected tile
         if (kb.IsKeyDown(Keys.F) && !_prevKb.IsKeyDown(Keys.F) && _trSelectedTile >= 0)
         {
-            var data = _trActiveLayer == 0 ? GetOrCreateRoomTiles(_trPaintRoom) : GetOrCreateRoomOverlay(_trPaintRoom);
+            var data = _trActiveLayer == 0 ? GetOrCreateRoomTiles(_trPaintRoom) : _trActiveLayer == 1 ? GetOrCreateRoomMid(_trPaintRoom) : GetOrCreateRoomOverlay(_trPaintRoom);
             for (int r = 0; r < roomRows; r++)
                 for (int c = 0; c < roomCols; c++)
                     data[r, c] = (_trSelectedSheet, _trSelectedTile);
@@ -26068,7 +26111,7 @@ public class Game1 : Game
                 int gr = (mouse.Y - camGY) / TSDst;
                 if (gc >= 0 && gc < roomCols && gr >= 0 && gr < roomRows && mouse.Y > 50)
                 {
-                    var data = _trActiveLayer == 0 ? GetOrCreateRoomTiles(_trPaintRoom) : GetOrCreateRoomOverlay(_trPaintRoom);
+                    var data = _trActiveLayer == 0 ? GetOrCreateRoomTiles(_trPaintRoom) : _trActiveLayer == 1 ? GetOrCreateRoomMid(_trPaintRoom) : GetOrCreateRoomOverlay(_trPaintRoom);
                     if (_trSelectedTile >= 0)
                         data[gr, gc] = (_trSelectedSheet, _trSelectedTile);
                     else
@@ -26085,8 +26128,8 @@ public class Game1 : Game
             if (gc >= 0 && gc < roomCols && gr >= 0 && gr < roomRows)
             {
                 // When viewing a specific layer, erase from that layer; otherwise use active layer
-                int eraseLayer = _trLayerView == 1 ? 0 : _trLayerView == 2 ? 1 : _trActiveLayer;
-                var data = eraseLayer == 0 ? GetOrCreateRoomTiles(_trPaintRoom) : GetOrCreateRoomOverlay(_trPaintRoom);
+                int eraseLayer = _trLayerView == 1 ? 0 : _trLayerView == 2 ? 1 : _trLayerView == 3 ? 2 : _trActiveLayer;
+                var data = eraseLayer == 0 ? GetOrCreateRoomTiles(_trPaintRoom) : eraseLayer == 1 ? GetOrCreateRoomMid(_trPaintRoom) : GetOrCreateRoomOverlay(_trPaintRoom);
                 data[gr, gc] = (-1, -1);
             }
         }
@@ -26268,6 +26311,7 @@ public class Game1 : Game
         
         // ── Room Grid (both layers) ──
         var bgData = GetOrCreateRoomTiles(_trPaintRoom);
+        var midData = GetOrCreateRoomMid(_trPaintRoom);
         var fgData = GetOrCreateRoomOverlay(_trPaintRoom);
         var mouse = Mouse.GetState();
         int maxR = Math.Min(roomRows, Math.Min(bgData.GetLength(0), fgData.GetLength(0)));
@@ -26283,8 +26327,8 @@ public class Game1 : Game
                 // Cull off-screen
                 if (dx + TSDst < palW || dx > ScreenW || dy + TSDst < 50 || dy > ScreenH) continue;
                 
-                // Background layer (visible when _trLayerView == 0 or 1)
-                if (_trLayerView != 2)
+                // Background layer (visible when view=0 all or view=1 BG only)
+                if (_trLayerView == 0 || _trLayerView == 1)
                 {
                 var (s, t) = bgData[r, c];
                 if (s >= 0 && t >= 0 && _tsSheets[s] != null)
@@ -26301,8 +26345,22 @@ public class Game1 : Game
                 }
                 }
                 
-                // Foreground/overlay layer (visible when _trLayerView == 0 or 2)
-                if (_trLayerView != 1)
+                // Mid layer (visible when view=0 all or view=2 MID only)
+                if (_trLayerView == 0 || _trLayerView == 2)
+                {
+                var (sm, tm) = midData[r, c];
+                if (sm >= 0 && tm >= 0 && _tsSheets[sm] != null)
+                {
+                    int sheetColsM = _tsSheets[sm].Width / TS16;
+                    int trM = tm / sheetColsM;
+                    int tcM = tm % sheetColsM;
+                    var srcM = new Rectangle(tcM * TS16, trM * TS16, TS16, TS16);
+                    _spriteBatch.Draw(_tsSheets[sm], new Rectangle(dx, dy, TSDst, TSDst), srcM, Color.White);
+                }
+                }
+                
+                // Foreground/overlay layer (visible when view=0 all or view=3 FG only)
+                if (_trLayerView == 0 || _trLayerView == 3)
                 {
                 var (s2, t2) = fgData[r, c];
                 if (s2 >= 0 && t2 >= 0 && _tsSheets[s2] != null)
@@ -26557,8 +26615,8 @@ public class Game1 : Game
         
         // ── Header (fixed) ──
         DrawRect(0, 0, ScreenW, 50, new Color(15, 15, 20, 230));
-        string layerStr = _trCollisionMode ? "COLLISION" : (_trActiveLayer == 0 ? "BG" : "FG");
-        string viewStr = _trLayerView == 0 ? "" : _trLayerView == 1 ? " [BG ONLY]" : " [FG ONLY]";
+        string layerStr = _trCollisionMode ? "COLLISION" : (_trActiveLayer == 0 ? "BG" : _trActiveLayer == 1 ? "MID" : "FG");
+        string viewStr = _trLayerView == 0 ? "" : _trLayerView == 1 ? " [BG ONLY]" : _trLayerView == 2 ? " [MID ONLY]" : " [FG ONLY]";
         string selStr = _trCollisionMode ? "Drag=add, RClick=del, Shift=half, Arrows=ledge, Space=player-only" : (_trSelectedTile >= 0 ? $"{_tsNames[_trSelectedSheet]}#{_trSelectedTile}" : "ERASER");
         string roomLabel = _trPaintRoom == 50 ? "5b (Cave)" : _trPaintRoom.ToString();
         string header = $"PAINT — Room {roomLabel} ({roomCols}×{roomRows})  |  Mode: {layerStr}{viewStr}  |  {selStr}";
