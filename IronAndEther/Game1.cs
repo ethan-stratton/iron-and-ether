@@ -58,11 +58,11 @@ public class Game1 : Game
     private int _trLayerView = 0; // 0=both, 1=BG only, 2=FG only
     
     // OneWay: 0=solid, 1=ledge hop up, 2=ledge hop down, 3=ledge hop left, 4=ledge hop right
-    // Ledge lines are SOLID walls that allow a hop animation in one direction after holding 0.3s
+    // Ledge lines are zero-thickness edges — only block movement perpendicular to the line
     private struct CollRect
     {
         public Rectangle Rect;
-        public int OneWay; // 0=solid wall, 1-4=ledge direction (blocks both ways, hop in arrow dir)
+        public int OneWay; // 0=solid wall, 1-4=ledge direction (zero-thickness edge, hop in arrow dir)
         public CollRect(Rectangle r, int oneWay = 0) { Rect = r; OneWay = oneWay; }
     }
     private const int TileSrc = 12; // source tile size in tileset
@@ -3068,27 +3068,58 @@ public class Game1 : Game
                 // One-way walls (ALttP ledge style):
                 // ow direction = direction player CAN hop THROUGH
                 // ow=1: hop up, ow=2: hop down, ow=3: hop left, ow=4: hop right
-                // Player is blocked normally; holding into the wall triggers a ledge hop
+                // Ledge lines: zero-thickness edges, only block perpendicular movement
                 if (ow > 0 && !_ledgeHopping)
                 {
-                    // Ledge walls are SOLID — block from all directions
-                    // But holding into them in the hop direction triggers a hop over
+                    bool isHorizontal = (ow <= 2); // 1=hop up, 2=hop down → horizontal line
+                    float linePos, playerMin, playerMax, playerCenter, halfSize;
+                    bool overlapsLine;
+                    float penetration;
+                    bool playerOnHopSide;
+                    
+                    if (isHorizontal)
+                    {
+                        // Horizontal ledge: check if player X overlaps wall X range
+                        // Line sits at the edge of the rect:
+                        // ow=1 (hop up): line at TOP of rect (player approaches from below)
+                        // ow=2 (hop down): line at BOTTOM of rect (player approaches from above)
+                        linePos = (ow == 1) ? wall.Top : wall.Bottom;
+                        overlapsLine = playerRect.Right > wall.Left && playerRect.Left < wall.Right;
+                        halfSize = PlayerHitboxH / 2f;
+                        playerCenter = _playerPos.Y + PlayerHitboxOffsetY;
+                        // ow=1 (hop up): player is below line, pushing up
+                        // ow=2 (hop down): player is above line, pushing down
+                        playerOnHopSide = (ow == 1) ? (playerCenter > linePos) : (playerCenter < linePos);
+                        penetration = (ow == 1) ? (linePos - playerRect.Top) : (playerRect.Bottom - linePos);
+                    }
+                    else
+                    {
+                        // Vertical ledge: check if player Y overlaps wall Y range
+                        linePos = (ow == 3) ? wall.Left : wall.Right;
+                        overlapsLine = playerRect.Bottom > wall.Top && playerRect.Top < wall.Bottom;
+                        halfSize = PlayerSize / 2f;
+                        playerCenter = _playerPos.X;
+                        playerOnHopSide = (ow == 3) ? (playerCenter > linePos) : (playerCenter < linePos);
+                        penetration = (ow == 3) ? (linePos - playerRect.Left) : (playerRect.Right - linePos);
+                    }
+                    
+                    if (!overlapsLine || penetration <= 0) continue; // not touching line
+                    
+                    // Check if player is pushing in the hop direction
                     bool pushing = false;
-                    if (ow == 1 && kb.IsKeyDown(Keys.W) && minPush == pushDown) pushing = true; // hop up, player below
-                    if (ow == 2 && kb.IsKeyDown(Keys.S) && minPush == pushUp) pushing = true;   // hop down, player above
-                    if (ow == 3 && kb.IsKeyDown(Keys.A) && minPush == pushRight) pushing = true; // hop left, player right
-                    if (ow == 4 && kb.IsKeyDown(Keys.D) && minPush == pushLeft) pushing = true;  // hop right, player left
+                    if (ow == 1 && kb.IsKeyDown(Keys.W) && playerOnHopSide) pushing = true;
+                    if (ow == 2 && kb.IsKeyDown(Keys.S) && playerOnHopSide) pushing = true;
+                    if (ow == 3 && kb.IsKeyDown(Keys.A) && playerOnHopSide) pushing = true;
+                    if (ow == 4 && kb.IsKeyDown(Keys.D) && playerOnHopSide) pushing = true;
                     
                     if (pushing && _ledgeHoldDir == ow)
                     {
                         _ledgeHoldTimer += dt;
                         if (_ledgeHoldTimer >= LedgeHopHoldTime)
                         {
-                            // Trigger ledge hop!
                             _ledgeHopping = true;
                             _ledgeHopTimer = 0f;
                             _ledgeHopStart = _playerPos;
-                            // Target: one tile past the wall in the hop direction
                             float hopDist = TSDst + PlayerSize;
                             _ledgeHopTarget = _playerPos;
                             if (ow == 1) _ledgeHopTarget.Y -= hopDist;
@@ -3097,7 +3128,7 @@ public class Game1 : Game
                             if (ow == 4) _ledgeHopTarget.X += hopDist;
                             _ledgeHoldTimer = 0f;
                             _ledgeHoldDir = 0;
-                            continue; // skip push-out, hop will handle movement
+                            continue;
                         }
                     }
                     else if (pushing)
@@ -3110,7 +3141,25 @@ public class Game1 : Game
                         _ledgeHoldTimer = 0f;
                         _ledgeHoldDir = 0;
                     }
-                    // Fall through to normal solid wall push-out below
+                    
+                    // Push out only along the perpendicular axis
+                    _pushingWall = true;
+                    if (isHorizontal)
+                    {
+                        if (playerOnHopSide)
+                            _playerPos.Y += penetration; // push away from line (back to hop side)
+                        else
+                            _playerPos.Y -= penetration; // push away from line (other side)
+                    }
+                    else
+                    {
+                        if (playerOnHopSide)
+                            _playerPos.X += penetration;
+                        else
+                            _playerPos.X -= penetration;
+                    }
+                    playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
+                    continue;
                 }
                 
                 _pushingWall = true;
@@ -21901,14 +21950,28 @@ public class Game1 : Game
                     var dw = dbgWalls[di];
                     int dow = (dbgOw != null && di < dbgOw.Count) ? dbgOw[di] : 0;
                     Color dc = dow > 0 ? Color.CornflowerBlue : Color.Red;
-                    DrawRect(dw.X, dw.Y, dw.Width, 1, dc);
-                    DrawRect(dw.X, dw.Y + dw.Height - 1, dw.Width, 1, dc);
-                    DrawRect(dw.X, dw.Y, 1, dw.Height, dc);
-                    DrawRect(dw.X + dw.Width - 1, dw.Y, 1, dw.Height, dc);
                     if (dow > 0)
                     {
+                        // Ledge: draw as a thick line on the edge
+                        if (dow <= 2) // horizontal ledge
+                        {
+                            int ly = (dow == 1) ? dw.Y : dw.Y + dw.Height - 1;
+                            DrawRect(dw.X, ly - 1, dw.Width, 3, dc);
+                        }
+                        else // vertical ledge
+                        {
+                            int lx = (dow == 3) ? dw.X : dw.X + dw.Width - 1;
+                            DrawRect(lx - 1, dw.Y, 3, dw.Height, dc);
+                        }
                         string[] arrows = { "", "↑", "↓", "←", "→" };
                         DrawTextFallback(dw.X + 2, dw.Y + 2, arrows[dow], Color.CornflowerBlue, 0.5f);
+                    }
+                    else
+                    {
+                        DrawRect(dw.X, dw.Y, dw.Width, 1, dc);
+                        DrawRect(dw.X, dw.Y + dw.Height - 1, dw.Width, 1, dc);
+                        DrawRect(dw.X, dw.Y, 1, dw.Height, dc);
+                        DrawRect(dw.X + dw.Width - 1, dw.Y, 1, dw.Height, dc);
                     }
                 }
             }
