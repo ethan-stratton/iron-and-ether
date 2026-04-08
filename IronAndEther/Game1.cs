@@ -859,6 +859,7 @@ public class Game1 : Game
     private const float PlayerHitboxOffsetY = 15f; // hitbox shifted down from sprite center
     // Wall push emotes
     private float _wallPushTime = 0f; // how long player has been pushing into a blocking wall
+    private Vector2 _preMovePos; // position before movement, for anti-jitter
     private const float EmoteScribbleTime = 1.0f; // seconds before scribble appears
     private const float EmoteAngerTime = 3.0f; // seconds before anger symbol
     private float _angerPulse = 0f; // animation timer for anger symbol dilation
@@ -2927,6 +2928,8 @@ public class Game1 : Game
             {
                 move.Normalize();
                 if (_wailDebuffTimer > 0) move = -move; // inverted movement
+                var preMovePos = _playerPos;
+                _preMovePos = _playerPos;
                 _playerPos += move * PlayerSpeed * (_webSlowTimer > 0 ? 0.4f : 1f) * dt;
                 
                 // Walk animation + facing direction (ping-pong: 0-1-2-1-0-1-2...)
@@ -3054,9 +3057,6 @@ public class Game1 : Game
         _pushingWall = false;
         if (!_inCave && !_ledgeHopping && _screenWalls.TryGetValue(_currentScreen, out var walls))
         {
-            // Run collision twice to resolve multi-wall jitter
-            for (int pass = 0; pass < 2; pass++)
-            {
             var playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
             _screenWallOneWay.TryGetValue(_currentScreen, out var owList);
             for (int wi = 0; wi < walls.Count; wi++)
@@ -3105,7 +3105,9 @@ public class Game1 : Game
                         // ow=1 (hop up): player is below line, pushing up
                         // ow=2 (hop down): player is above line, pushing down
                         playerOnHopSide = (ow == 1) ? (playerCenter > linePos) : (playerCenter < linePos);
-                        penetration = (ow == 1) ? (linePos - playerRect.Top) : (playerRect.Bottom - linePos);
+                        float pTop = _playerPos.Y + PlayerHitboxOffsetY - PlayerHitboxH / 2f;
+                        float pBot = _playerPos.Y + PlayerHitboxOffsetY + PlayerHitboxH / 2f;
+                        penetration = (ow == 1) ? (linePos - pTop) : (pBot - linePos);
                     }
                     else
                     {
@@ -3119,7 +3121,9 @@ public class Game1 : Game
                         halfSize = PlayerSize / 2f;
                         playerCenter = _playerPos.X;
                         playerOnHopSide = (ow == 3) ? (playerCenter > linePos) : (playerCenter < linePos);
-                        penetration = (ow == 3) ? (linePos - playerRect.Left) : (playerRect.Right - linePos);
+                        float pLeft = _playerPos.X - PlayerSize / 2f;
+                        float pRight = _playerPos.X + PlayerSize / 2f;
+                        penetration = (ow == 3) ? (linePos - pLeft) : (pRight - linePos);
                     }
                     
                     if (!overlapsLine || penetration <= 0) continue; // not touching line
@@ -3147,7 +3151,7 @@ public class Game1 : Game
                             if (ow == 4) _ledgeHopTarget.X += hopDist;
                             _ledgeHoldTimer = 0f;
                             _ledgeHoldDir = 0;
-                            continue;
+                            break; // stop checking walls this frame — hop is starting
                         }
                     }
                     else if (pushing)
@@ -3161,31 +3165,35 @@ public class Game1 : Game
                         _ledgeHoldDir = 0;
                     }
                     
-                    // Push out only along the perpendicular axis (+1px buffer to prevent jitter)
+                    // Push out only along the perpendicular axis (float-precise)
                     _pushingWall = true;
                     if (isHorizontal)
                     {
+                        float pTop = _playerPos.Y + PlayerHitboxOffsetY - PlayerHitboxH / 2f;
+                        float pBot = _playerPos.Y + PlayerHitboxOffsetY + PlayerHitboxH / 2f;
                         if (_playerPos.Y + PlayerHitboxOffsetY > linePos)
                         {
-                            float fix = linePos - playerRect.Top + 0.5f;
+                            float fix = linePos - pTop;
                             if (fix > 0) _playerPos.Y += fix;
                         }
                         else
                         {
-                            float fix = playerRect.Bottom - linePos + 0.5f;
+                            float fix = pBot - linePos;
                             if (fix > 0) _playerPos.Y -= fix;
                         }
                     }
                     else
                     {
+                        float pLeft = _playerPos.X - PlayerSize / 2f;
+                        float pRight = _playerPos.X + PlayerSize / 2f;
                         if (_playerPos.X > linePos)
                         {
-                            float fix = linePos - playerRect.Left + 0.5f;
+                            float fix = linePos - pLeft;
                             if (fix > 0) _playerPos.X += fix;
                         }
                         else
                         {
-                            float fix = playerRect.Right - linePos + 0.5f;
+                            float fix = pRight - linePos;
                             if (fix > 0) _playerPos.X -= fix;
                         }
                     }
@@ -3193,14 +3201,24 @@ public class Game1 : Game
                     continue;
                 }
                 
+                // Solid wall or player-only wall: push out using float-precise hitbox
+                float fLeft = _playerPos.X - PlayerSize / 2f;
+                float fRight = _playerPos.X + PlayerSize / 2f;
+                float fTop = _playerPos.Y + PlayerHitboxOffsetY - PlayerHitboxH / 2f;
+                float fBot = _playerPos.Y + PlayerHitboxOffsetY + PlayerHitboxH / 2f;
+                float fpLeft = fRight - wall.Left;
+                float fpRight = wall.Right - fLeft;
+                float fpUp = fBot - wall.Top;
+                float fpDown = wall.Bottom - fTop;
+                float fMinPush = MathF.Min(MathF.Min(fpLeft, fpRight), MathF.Min(fpUp, fpDown));
+                
                 _pushingWall = true;
-                if (minPush == pushLeft) _playerPos.X -= pushLeft;
-                else if (minPush == pushRight) _playerPos.X += pushRight;
-                else if (minPush == pushUp) _playerPos.Y -= pushUp;
-                else _playerPos.Y += pushDown;
+                if (fMinPush == fpLeft) _playerPos.X -= fpLeft;
+                else if (fMinPush == fpRight) _playerPos.X += fpRight;
+                else if (fMinPush == fpUp) _playerPos.Y -= fpUp;
+                else _playerPos.Y += fpDown;
                 playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
             }
-            } // end collision pass
         }
         
         // Pedestal collision (pickups have solid pedestals)
