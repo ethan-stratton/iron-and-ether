@@ -14,3 +14,7 @@ IronAndEther/bin/
 # Build outputs
 **/bin/
 **/obj/
+
+# Design docs (local only — don't share game design details publicly)
+*.md
+!README.md
