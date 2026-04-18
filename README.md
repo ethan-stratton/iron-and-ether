@@ -1,9 +1,3 @@
-# Iron & Ether
-
-A top-down action game set in alternate-reality Camelot. You're a knight with a magic wand that evolves based on enemy essences you collect. Three combinable slots (Form × Behavior × Essence) produce hundreds of weapon variations, and specific combos trigger **Spell Fusions** — curated, spectacular attacks with unique visuals.
-
-*Zelda 1 room structure meets Aria of Sorrow soul acquisition meets HoD Spell Fusion spectacle.*
-
 ## How to Run
 
 **Requirements:** [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
