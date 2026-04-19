@@ -16088,7 +16088,9 @@ public class Game1 : Game
     private void CheckAwakeningRoom2Completion()
     {
         if (_gameMode != GameMode.Awakening || _currentScreen != 2) return;
+        if (_inTransition || _screenTransitionTimer > 0) return; // don't check during room transition
         if (_clearedScreens.Contains(2)) return;
+        if (_enemies.Count == 0) return; // dummies not spawned yet
         if (_enemies.Any(e => e.Alive)) return;
         
         // All dummies destroyed — spawn Lance on a pedestal (mark cleared immediately)
@@ -25757,20 +25759,20 @@ public class Game1 : Game
     
     private Rectangle GetPaintArena(int room)
     {
-        if (room == 50) // Cave: 9×7 tiles matching in-game cave tile origin
+        if (room == 50) // Cave: 10×8 tiles matching in-game cave tile origin
         {
             // Must match DrawCave() tile rendering: ox = ca.X - TSDst, oy = ca.Y - TSDst
             // ca = _caveArea = centered 400×300 on screen
             int caX = ScreenW / 2 - 200; // 440
             int caY = ScreenH / 2 - 150;  // 210
-            return new Rectangle(caX - TSDst, caY - TSDst, 9 * TSDst, 7 * TSDst);
+            return new Rectangle(caX - TSDst, caY - TSDst, 10 * TSDst, 8 * TSDst);
         }
         return new Rectangle(60, 80, 1160, room == 11 ? 1300 : 580);
     }
     
     private (int cols, int rows) GetRoomTileSize(int room)
     {
-        if (room == 50) return (9, 7); // Room 5b (cave interior): 400×300 → 9×7 tiles
+        if (room == 50) return (10, 8); // Room 5b (cave interior): 400×300 → 10×8 tiles (1-tile border all sides)
         // Full screen width always 1280. Height depends on room
         int totalW = 1280; // ScreenW
         int totalH = room == 11 ? (80 + 1300 + 80) : 720; // Room 11: top margin + tall arena + bottom
