@@ -281,6 +281,7 @@ public class Game1 : Game
     private int _caveReturnScreen = 5;
     private Vector2 _caveReturnPos;
     private Rectangle _caveArea; // the cave interior bounds
+    private List<Rectangle> _caveWalls = new(); // editor-placed collision inside cave (game coords)
     private Rectangle _caveEntrance; // the entrance hitbox in the overworld
     private Rectangle _caveExit; // the exit hitbox inside the cave
     private float _caveTransitionTimer = 0f;
@@ -16569,6 +16570,22 @@ public class Game1 : Game
             _playerPos.X = MathHelper.Clamp(_playerPos.X, _caveArea.Left + 10, rightClamp);
             _playerPos.Y = MathHelper.Clamp(_playerPos.Y, _caveArea.Top + 10, _caveArea.Bottom - 10);
             
+            // Editor-placed cave interior walls (room 50 collision)
+            foreach (var cw in _caveWalls)
+            {
+                var playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
+                if (!playerRect.Intersects(cw)) continue;
+                float pushL = playerRect.Right - cw.Left;
+                float pushR = cw.Right - playerRect.Left;
+                float pushU = playerRect.Bottom - cw.Top;
+                float pushD = cw.Bottom - playerRect.Top;
+                float minP = MathF.Min(MathF.Min(pushL, pushR), MathF.Min(pushU, pushD));
+                if (minP == pushL) _playerPos.X -= pushL;
+                else if (minP == pushR) _playerPos.X += pushR;
+                else if (minP == pushU) _playerPos.Y -= pushU;
+                else _playerPos.Y += pushD;
+            }
+            
             // Cracked wall — right wall of cave
             if (!_crackedWallBroken)
             {
@@ -16809,9 +16826,10 @@ public class Game1 : Game
             
             if (!_crackedWallBroken)
             {
-                // Crack lines on the right wall — darker than wall color (40,36,34)
-                Color crackCol = new Color(20, 16, 14);
-                Color crackGlow = new Color(80, 60, 50);
+                // Crack lines on the right wall — visible against wall color (40,36,34)
+                Color crackCol = new Color(10, 8, 6);
+                Color crackHighlight = new Color(60, 52, 46); // lighter edge to make cracks pop
+                Color crackGlow = new Color(120, 80, 50);
                 // Main crack — a jagged vertical line
                 DrawRect(crackX - 2, crackY + 5, 2, 16, crackCol);
                 DrawRect(crackX - 1, crackY + 10, 2, 10, crackCol);
@@ -16821,10 +16839,14 @@ public class Game1 : Game
                 DrawRect(crackX - 5, crackY + 14, 4, 2, crackCol);
                 DrawRect(crackX - 6, crackY + 27, 5, 2, crackCol);
                 DrawRect(crackX + 1, crackY + 18, 4, 2, crackCol);
-                // Faint warm glow through the cracks (hints at something behind)
+                // Highlight edges (light side of cracks to add depth)
+                DrawRect(crackX - 1, crackY + 6, 1, 14, crackHighlight * 0.4f);
+                DrawRect(crackX - 2, crackY + 22, 1, 10, crackHighlight * 0.4f);
+                DrawRect(crackX - 4, crackY + 15, 3, 1, crackHighlight * 0.3f);
+                // Warm glow through the cracks (hints at something behind)
                 float glowPulse = (MathF.Sin(time * 1.5f) + 1f) / 2f;
-                DrawRect(crackX - 1, crackY + 12, 1, 8, crackGlow * (0.1f + glowPulse * 0.08f));
-                DrawRect(crackX - 2, crackY + 25, 1, 6, crackGlow * (0.08f + glowPulse * 0.06f));
+                DrawRect(crackX - 1, crackY + 12, 1, 8, crackGlow * (0.15f + glowPulse * 0.12f));
+                DrawRect(crackX - 2, crackY + 25, 1, 6, crackGlow * (0.12f + glowPulse * 0.10f));
                 // Tiny dust drip
                 float dustY = (time * 12f) % (crackH + 20f);
                 if (dustY < crackH)
@@ -18239,7 +18261,7 @@ public class Game1 : Game
         foreach (var kvp in _roomCollision)
         {
             int room = kvp.Key;
-            if (room == 50) continue;
+            if (room == 50) continue; // Cave collision applied separately via _caveCollision
             if (!_screenWalls.ContainsKey(room))
                 _screenWalls[room] = new List<Rectangle>();
             else
@@ -18249,6 +18271,21 @@ public class Game1 : Game
             {
                 _screenWalls[room].Add(cr.Rect);
                 _screenWallOneWay[room].Add(cr.OneWay);
+            }
+        }
+        
+        // Room 50 (cave) collision — convert from editor grid coords to game screen coords
+        _caveWalls.Clear();
+        if (_roomCollision.TryGetValue(50, out var caveCollRects))
+        {
+            // Editor grid origin for room 50 = cave tile origin = (ca.X - TSDst, ca.Y - TSDst)
+            // Collision rects are stored relative to grid origin, and game renders tiles at same origin
+            // So rects are already in the right coordinate space relative to the tile grid
+            int caveOX = ScreenW / 2 - 200 - TSDst; // 392
+            int caveOY = ScreenH / 2 - 150 - TSDst; // 162
+            foreach (var cr in caveCollRects)
+            {
+                _caveWalls.Add(new Rectangle(caveOX + cr.Rect.X, caveOY + cr.Rect.Y, cr.Rect.Width, cr.Rect.Height));
             }
         }
     }
@@ -25720,10 +25757,13 @@ public class Game1 : Game
     
     private Rectangle GetPaintArena(int room)
     {
-        if (room == 50) // Cave: 9×7 tiles centered on screen
+        if (room == 50) // Cave: 9×7 tiles matching in-game cave tile origin
         {
-            int w = 9 * TSDst, h = 7 * TSDst;
-            return new Rectangle((ScreenW - w) / 2, (ScreenH - h) / 2, w, h);
+            // Must match DrawCave() tile rendering: ox = ca.X - TSDst, oy = ca.Y - TSDst
+            // ca = _caveArea = centered 400×300 on screen
+            int caX = ScreenW / 2 - 200; // 440
+            int caY = ScreenH / 2 - 150;  // 210
+            return new Rectangle(caX - TSDst, caY - TSDst, 9 * TSDst, 7 * TSDst);
         }
         return new Rectangle(60, 80, 1160, room == 11 ? 1300 : 580);
     }
@@ -26428,16 +26468,83 @@ public class Game1 : Game
         // ── Collision/Object Overlay ──
         if (_trShowOverlay)
         {
-            // Arena boundary — green outline
-            int oax = gridX + 60; // arena.Left=60
-            int oay = gridY + 80; // arena.Top=80
-            int oaw = 1160, oah = (_trPaintRoom == 11) ? 1300 : 580;
+            // Arena boundary — green outline (adjusted for room 50 cave)
+            int oax, oay, oaw, oah;
+            if (_trPaintRoom == 50)
+            {
+                // Cave: show _caveArea relative to tile grid origin
+                // In-game cave tiles start at (ca.X - TSDst, ca.Y - TSDst) = (392, 162)
+                // Editor grid origin for room 50 = ((1280-432)/2, (720-336)/2) = (424, 192)  
+                // But stored coords are grid-relative (0,0 = grid top-left)
+                // Cave area in game: (440, 210, 400, 300)
+                // Cave tile origin in game: (392, 162)
+                // In grid coords: cave area = (440-392, 210-162, 400, 300) = (48, 48, 400, 300) = (TSDst, TSDst, 400, 300)
+                oax = gridX + TSDst;
+                oay = gridY + TSDst;
+                oaw = 400; oah = 300;
+            }
+            else
+            {
+                oax = gridX + 60; // arena.Left=60
+                oay = gridY + 80; // arena.Top=80
+                oaw = 1160; oah = (_trPaintRoom == 11) ? 1300 : 580;
+            }
             DrawRect(oax, oay, oaw, 2, Color.Lime * 0.6f);
             DrawRect(oax, oay + oah, oaw, 2, Color.Lime * 0.6f);
             DrawRect(oax, oay, 2, oah, Color.Lime * 0.6f);
             DrawRect(oax + oaw, oay, 2, oah, Color.Lime * 0.6f);
             // Label
-            DrawTextOutlined(oax + 4, oay + 4, "ARENA", Color.Lime * 0.8f, Color.Black, 0.6f);
+            DrawTextOutlined(oax + 4, oay + 4, _trPaintRoom == 50 ? "CAVE AREA" : "ARENA", Color.Lime * 0.8f, Color.Black, 0.6f);
+            
+            // ── Pickup / Spawn Point Markers ──
+            // Show where pickups and key items spawn for the current room
+            var editorPickups = new List<(Vector2 pos, string label, Color color)>();
+            if (_trPaintRoom == 5)
+            {
+                // Room 5 outdoor pickups — cave entrance area
+                int ax5 = 60, ay5 = 80; // standard arena
+                editorPickups.Add((new Vector2(ax5 + 274 + 24, ay5 + 160 + 24), "CAVE ENTRANCE", Color.Cyan));
+            }
+            else if (_trPaintRoom == 50)
+            {
+                // Cave interior items — positions relative to tile grid origin
+                // Wand: at (caveCX, caveCY-10) in game = (640, 350) in screen coords
+                // In grid coords: (640-392, 350-162) = (248, 188)
+                int caveGridOX = ScreenW / 2 - (9 * TSDst / 2) - (ScreenW / 2 - 200 - TSDst); // = TSDst
+                // Simpler: cave tile origin = ca.X - TSDst. Grid origin maps to cave tile origin.
+                // So game coord -> grid coord: subtract (ca.X - TSDst, ca.Y - TSDst) = (392, 162)
+                int gox = ScreenW / 2 - 200 - TSDst; // 392
+                int goy = ScreenH / 2 - 150 - TSDst; // 162
+                editorPickups.Add((new Vector2(ScreenW / 2 - gox, ScreenH / 2 - 10 - goy), "WAND", new Color(255, 215, 0)));
+                // Cracked wall / Wand of Merlin: right wall of cave area
+                int crackX = TSDst + 400 - 6; // ca.Right - 6 in grid coords = (ca.X + 400 - 6 - gox) = TSDst + 400 - 6
+                int crackY = TSDst + 300 / 3; // ca.Y + ca.Height/3 - goy = TSDst + 100
+                editorPickups.Add((new Vector2(crackX, crackY + 25), "CRACKED WALL", new Color(180, 140, 60)));
+                // Wand of Merlin spawns at ca.Right + 30 (in alcove behind crack)
+                editorPickups.Add((new Vector2(TSDst + 400 + 30, crackY + 25), "WAND OF MERLIN", new Color(100, 80, 200)));
+            }
+            else if (_trPaintRoom == 6)
+            {
+                // Essence crystals in room 6 — these are dynamic but show approximate area
+                editorPickups.Add((new Vector2(60 + 580, 80 + 290), "ESSENCE CRYSTALS", new Color(150, 100, 255)));
+            }
+            
+            foreach (var (pos, label, color) in editorPickups)
+            {
+                int mx = gridX + (int)pos.X;
+                int my = gridY + (int)pos.Y;
+                // Diamond marker
+                DrawRect(mx - 6, my - 1, 12, 2, color);
+                DrawRect(mx - 1, my - 6, 2, 12, color);
+                DrawRect(mx - 4, my - 3, 8, 1, color * 0.7f);
+                DrawRect(mx - 4, my + 2, 8, 1, color * 0.7f);
+                DrawRect(mx - 3, my - 4, 6, 1, color * 0.7f);
+                DrawRect(mx - 3, my + 3, 6, 1, color * 0.7f);
+                // Fill
+                DrawRect(mx - 3, my - 2, 6, 4, color * 0.3f);
+                // Label
+                DrawTextOutlined(mx + 8, my - 6, label, color * 0.9f, Color.Black, 0.5f);
+            }
             
             // Wall rects — red semi-transparent fill
             if (_screenWalls.TryGetValue(_trPaintRoom, out var walls))
