@@ -127,6 +127,14 @@ public class Game1 : Game
     private Texture2D _titlePortrait;
     private Texture2D _titleWand;
 
+    // Enemy sprite sheets
+    private Texture2D _spriteSlimeIdle;     // flower slime (idle.png) 3×3
+    private Texture2D _spriteChomp;         // sprout slime (chomp_idle.png) 4×3
+    private Texture2D _spriteJorg;          // carrot slime (jorg_idle.png) 4×3
+    private Texture2D _spriteJorgette;      // flat orange (jorgette-idle.png) 4×3
+    private Texture2D _spriteWonwon;        // mushroom slime (wonwon.png) 4×3
+    private Texture2D _spriteMomo;          // pink blob (momo_idle_shadow.png) 4×3
+
     // State machine
     private GameState _state = GameState.Intro;
     private GameMode _gameMode = GameMode.Campaign;
@@ -1567,6 +1575,35 @@ public class Game1 : Game
         _tsDungeon = _tsSheets[0]; _tsExterior = _tsSheets[1]; _tsInterior = _tsSheets[2];
         _tsShip = _tsSheets[3]; _tsWorld = _tsSheets[4];
         LoadRoomTiles();
+
+        // Load enemy sprite sheets
+        string enemySpritePath = Path.Combine(Content.RootDirectory, "enemy sprites", "slime thing");
+        void LoadEnemySprite(ref Texture2D field, string filename)
+        {
+            string path = Path.Combine(enemySpritePath, filename);
+            if (File.Exists(path))
+            {
+                using var stream = File.OpenRead(path);
+                field = Texture2D.FromStream(GraphicsDevice, stream);
+                // Premultiply alpha
+                var px = new Color[field.Width * field.Height];
+                field.GetData(px);
+                for (int p = 0; p < px.Length; p++)
+                    px[p] = new Color(
+                        (int)(px[p].R * px[p].A / 255f),
+                        (int)(px[p].G * px[p].A / 255f),
+                        (int)(px[p].B * px[p].A / 255f),
+                        px[p].A);
+                field.SetData(px);
+                Console.WriteLine($"Enemy sprite loaded: {filename} ({field.Width}x{field.Height})");
+            }
+        }
+        LoadEnemySprite(ref _spriteSlimeIdle, "idle.png");
+        LoadEnemySprite(ref _spriteChomp, "chomp_idle.png");
+        LoadEnemySprite(ref _spriteJorg, "jorg_idle.png");
+        LoadEnemySprite(ref _spriteJorgette, "jorgette-idle.png");
+        LoadEnemySprite(ref _spriteWonwon, "wonwon.png");
+        LoadEnemySprite(ref _spriteMomo, "momo_idle_shadow.png");
 
         _playerPos = new Vector2(_arena.Center.X, _arena.Center.Y);
         _undinePos = _playerPos + new Vector2(20, -10);
@@ -13516,6 +13553,18 @@ public class Game1 : Game
                 e.SpawnTimer = 0.4f;
                 e.SpawnDuration = 0.4f;
                 e.FusionTag = "weak_linger";
+                // Assign sprite — cycle through slime sprites
+                Texture2D[] swarmSprites = { _spriteChomp, _spriteJorg, _spriteJorgette, _spriteWonwon, _spriteMomo };
+                var swarmSpr = swarmSprites[i % swarmSprites.Length];
+                if (swarmSpr != null)
+                {
+                    e.SpriteSheet = swarmSpr;
+                    e.SpriteFrameW = 32; e.SpriteFrameH = 32;
+                    e.SpriteCols = 4; e.SpriteRows = 3;
+                    e.SpriteAnimSpeed = 0.12f;
+                    e.SpriteFrame = i % 12; // stagger start frames
+                }
+                e.Size = 28f; // match 32px sprite with some breathing room
                 _enemies.Add(e);
                 _enemyById[e.Id] = e;
             }
@@ -13536,6 +13585,16 @@ public class Game1 : Game
                 e.SpawnTimer = 0.5f;
                 e.SpawnDuration = 0.5f;
                 e.FusionTag = "weak_shatter";
+                // Big jorg sprites for armored enemies
+                if (_spriteJorg != null)
+                {
+                    e.SpriteSheet = _spriteJorg;
+                    e.SpriteFrameW = 32; e.SpriteFrameH = 32;
+                    e.SpriteCols = 4; e.SpriteRows = 3;
+                    e.SpriteAnimSpeed = 0.2f; // slower for heavy enemies
+                    e.SpriteFrame = i * 4;
+                }
+                e.Size = 40f; // bigger for armored heavies
                 _enemies.Add(e);
                 _enemyById[e.Id] = e;
             }
@@ -13556,6 +13615,16 @@ public class Game1 : Game
                 e.SpawnTimer = 0.4f;
                 e.SpawnDuration = 0.4f;
                 e.FusionTag = "weak_bloom";
+                // Wonwon sprites for evasive enemies
+                if (_spriteWonwon != null)
+                {
+                    e.SpriteSheet = _spriteWonwon;
+                    e.SpriteFrameW = 32; e.SpriteFrameH = 32;
+                    e.SpriteCols = 4; e.SpriteRows = 3;
+                    e.SpriteAnimSpeed = 0.1f; // fast for evasive
+                    e.SpriteFrame = i * 3;
+                }
+                e.Size = 28f;
                 e.AiStateTimer = 1f + (float)_rng.NextDouble() * 2f; // teleport timer
                 _enemies.Add(e);
                 _enemyById[e.Id] = e;
@@ -13577,6 +13646,16 @@ public class Game1 : Game
                 e.SpawnTimer = 0.5f;
                 e.SpawnDuration = 0.5f;
                 e.AiStateTimer = 1f + i * 0.8f; // stagger first charges
+                // Momo sprites for chargers
+                if (_spriteMomo != null)
+                {
+                    e.SpriteSheet = _spriteMomo;
+                    e.SpriteFrameW = 32; e.SpriteFrameH = 32;
+                    e.SpriteCols = 4; e.SpriteRows = 3;
+                    e.SpriteAnimSpeed = 0.08f; // fast animation for chargers
+                    e.SpriteFrame = i * 4;
+                }
+                e.Size = 32f;
                 _enemies.Add(e);
                 _enemyById[e.Id] = e;
             }
@@ -13597,6 +13676,16 @@ public class Game1 : Game
                 e.SpawnTimer = 0.3f;
                 e.SpawnDuration = 0.3f;
                 e.AiStateTimer = 0.1f + (float)_rng.NextDouble() * 0.4f;
+                // Chomp sprites for gremlins — tiny and chaotic
+                if (_spriteChomp != null)
+                {
+                    e.SpriteSheet = _spriteChomp;
+                    e.SpriteFrameW = 32; e.SpriteFrameH = 32;
+                    e.SpriteCols = 4; e.SpriteRows = 3;
+                    e.SpriteAnimSpeed = 0.08f;
+                    e.SpriteFrame = i % 12;
+                }
+                e.Size = 22f; // small but visible
                 _enemies.Add(e);
                 _enemyById[e.Id] = e;
             }
@@ -13617,6 +13706,16 @@ public class Game1 : Game
                 e.SpawnTimer = 0.6f;
                 e.SpawnDuration = 0.6f;
                 e.AiStateTimer = 0.5f + i * 0.7f; // stagger materializations
+                // Jorgette sprites for wraiths
+                if (_spriteJorgette != null)
+                {
+                    e.SpriteSheet = _spriteJorgette;
+                    e.SpriteFrameW = 32; e.SpriteFrameH = 32;
+                    e.SpriteCols = 4; e.SpriteRows = 3;
+                    e.SpriteAnimSpeed = 0.15f;
+                    e.SpriteFrame = i * 4;
+                }
+                e.Size = 30f;
                 _enemies.Add(e);
                 _enemyById[e.Id] = e;
             }
@@ -13626,11 +13725,20 @@ public class Game1 : Game
                 float ey = ay + 80 + (float)_rng.NextDouble() * (ah - 160);
                 var e = new Enemy(new Vector2(ex, ey), 30f);
                 e.Speed = 50f;
-                e.Size = 8f;
                 e.BaseColor = new Color(200, 200, 200);
                 e.Type = EnemyType.Squire;
                 e.SpawnTimer = 0.4f;
                 e.SpawnDuration = 0.4f;
+                // Flower slime sprites for squires
+                if (_spriteSlimeIdle != null)
+                {
+                    e.SpriteSheet = _spriteSlimeIdle;
+                    e.SpriteFrameW = 32; e.SpriteFrameH = 32;
+                    e.SpriteCols = 3; e.SpriteRows = 3;
+                    e.SpriteAnimSpeed = 0.15f;
+                    e.SpriteFrame = i * 3;
+                }
+                e.Size = 24f;
                 _enemies.Add(e);
                 _enemyById[e.Id] = e;
             }
@@ -13653,7 +13761,10 @@ public class Game1 : Game
             _loadout = _loadout with { Behavior = Behavior.Linger };
             RefreshCombo();
             _gauntletPractice = true;
-            _enemies.Add(new Enemy(new Vector2(_arena.Left + _arena.Width / 2, _arena.Top + _arena.Height / 2 - 50), 15f) { Size = 14f, Speed = 0f, BaseColor = new Color(139, 119, 101) });
+            var dummy1 = new Enemy(new Vector2(_arena.Left + _arena.Width / 2, _arena.Top + _arena.Height / 2 - 50), 15f) { Speed = 0f, BaseColor = new Color(139, 119, 101) };
+            if (_spriteSlimeIdle != null) { dummy1.SpriteSheet = _spriteSlimeIdle; dummy1.SpriteFrameW = 32; dummy1.SpriteFrameH = 32; dummy1.SpriteCols = 3; dummy1.SpriteRows = 3; dummy1.SpriteAnimSpeed = 0.2f; }
+            dummy1.Size = 28f;
+            _enemies.Add(dummy1);
             if (!_awakeningIntroShown.Contains(1))
             {
                 _textBoxMessage = "The Gauntlet. The right tool for the right foe.\nTry out your new ability on this target.";
@@ -13706,7 +13817,10 @@ public class Game1 : Game
                         RefreshCombo();
                     }
                     _gauntletPractice = true;
-                    _enemies.Add(new Enemy(new Vector2(_arena.Left + _arena.Width / 2, _arena.Top + _arena.Height / 2 - 50), 15f) { Size = 14f, Speed = 0f, BaseColor = new Color(139, 119, 101) });
+                    var dummy2 = new Enemy(new Vector2(_arena.Left + _arena.Width / 2, _arena.Top + _arena.Height / 2 - 50), 15f) { Speed = 0f, BaseColor = new Color(139, 119, 101) };
+                    if (_spriteSlimeIdle != null) { dummy2.SpriteSheet = _spriteSlimeIdle; dummy2.SpriteFrameW = 32; dummy2.SpriteFrameH = 32; dummy2.SpriteCols = 3; dummy2.SpriteRows = 3; dummy2.SpriteAnimSpeed = 0.2f; }
+                    dummy2.Size = 28f;
+                    _enemies.Add(dummy2);
                     _textBoxMessage = "Try out your new ability on this target.";
                     _textBoxWaiting = true;
                 }

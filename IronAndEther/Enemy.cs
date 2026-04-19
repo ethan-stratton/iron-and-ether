@@ -86,6 +86,16 @@ public class Enemy
     // Stasis
     public float StasisTimer;
     
+    // Sprite animation
+    public Texture2D SpriteSheet;      // if set, draw from sprite sheet instead of procedural
+    public int SpriteFrameW = 32;      // frame width in pixels
+    public int SpriteFrameH = 32;      // frame height in pixels
+    public int SpriteCols = 4;         // columns in sheet
+    public int SpriteRows = 3;         // rows in sheet  
+    public float SpriteAnimSpeed = 0.15f; // seconds per frame
+    public float SpriteAnimTimer;      // accumulated time
+    public int SpriteFrame;            // current frame index
+    
     // Type & AI
     public EnemyType Type = EnemyType.Squire;
     public float ShootTimer;        // countdown to next shot
@@ -129,6 +139,18 @@ public class Enemy
         if (HitFlash > 0) HitFlash -= dt;
         if (SquashTimer > 0) SquashTimer -= dt;
         if (HitCooldown > 0) HitCooldown -= dt;
+        
+        // Sprite animation
+        if (SpriteSheet != null)
+        {
+            SpriteAnimTimer += dt;
+            int totalFrames = SpriteCols * SpriteRows;
+            if (SpriteAnimTimer >= SpriteAnimSpeed)
+            {
+                SpriteAnimTimer -= SpriteAnimSpeed;
+                SpriteFrame = (SpriteFrame + 1) % totalFrames;
+            }
+        }
         
         // Track distance for procedural leg animation
         DistanceTraveled += Vector2.Distance(Position, PrevPosition);
@@ -914,8 +936,33 @@ public class Enemy
                 bx += (int)sway;
                 by += (int)bob;
             }
+            
+            // Sprite sheet rendering (if available)
+            if (SpriteSheet != null && Type != EnemyType.Maw)
+            {
+                int frameCol = SpriteFrame % SpriteCols;
+                int frameRow = SpriteFrame / SpriteCols;
+                var srcRect = new Rectangle(frameCol * SpriteFrameW, frameRow * SpriteFrameH, SpriteFrameW, SpriteFrameH);
+                // Draw centered on position, scaled to Size
+                int sprDrawW = (int)(SpriteFrameW * scale * (Size / 14f)); // scale relative to default 14px size
+                int sprDrawH = (int)(SpriteFrameH * scale * (Size / 14f));
+                var destRect = new Rectangle((int)Position.X - sprDrawW / 2, (int)Position.Y - sprDrawH / 2, sprDrawW, sprDrawH);
+                
+                // Apply color tint for status effects
+                Color tint = Color.White;
+                if (HitFlash > 0) tint = Color.White;
+                else if (IsBroken) tint = ((int)(BreakTimer * 20) % 2 == 0) ? Color.White : Color.Lerp(Color.White, Color.Red, 0.3f);
+                else if (StasisTimer > 0) tint = Color.Lerp(Color.White, new Color(200, 230, 255), 0.5f);
+                else if (Possessed) tint = Color.Lerp(Color.White, new Color(255, 215, 0), 0.4f);
+                else if (Pacified) tint = Color.Lerp(Color.White, new Color(240, 235, 220), 0.5f);
+                else if (IgniteTimer > 0) tint = Color.Lerp(Color.White, new Color(255, 140, 40), 0.3f);
+                else if (SlowTimer > 0) tint = Color.Lerp(Color.White, new Color(100, 180, 60), 0.3f);
+                else if (FearTimer > 0) tint = Color.Lerp(Color.White, new Color(120, 40, 160), 0.3f);
+                
+                sb.Draw(SpriteSheet, destRect, srcRect, tint);
+            }
             // HedgeSniper: invisible when hidden
-            if (Type == EnemyType.HedgeSniper && AiPhase == 0)
+            else if (Type == EnemyType.HedgeSniper && AiPhase == 0)
             {
                 // Draw faint outline only
                 Color hiddenC = c * 0.15f;
