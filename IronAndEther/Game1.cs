@@ -11403,11 +11403,13 @@ public class Game1 : Game
         int ax = _arena.Left, ay = _arena.Top, aw = _arena.Width, ah = _arena.Height;
         switch (screen)
         {
-            case 1:
+            case 1: // Gauntlet — dark arena, torches at corners and midpoints
                 _torches.Add(new Vector2(ax + 60, ay + 60));
                 _torches.Add(new Vector2(ax + aw - 60, ay + 60));
                 _torches.Add(new Vector2(ax + 60, ay + ah - 60));
                 _torches.Add(new Vector2(ax + aw - 60, ay + ah - 60));
+                _torches.Add(new Vector2(ax + aw / 2, ay + 60));
+                _torches.Add(new Vector2(ax + aw / 2, ay + ah - 60));
                 break;
             case 2: // Armory — torches along walls
                 _torches.Add(new Vector2(ax + 100, ay + 80));
