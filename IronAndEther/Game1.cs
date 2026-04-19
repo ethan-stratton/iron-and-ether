@@ -11306,7 +11306,7 @@ public class Game1 : Game
         _caveEntrance = new Rectangle(ax + 274, ay + 160, 48, 48);
         
         // Cave interior area — centered on screen
-        int caveW = 400, caveH = 300;
+        int caveW = 8 * TSDst, caveH = 6 * TSDst; // 384×288, tile-aligned
         int caveCX = ScreenW / 2, caveCY = ScreenH / 2;
         _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
         
@@ -11373,7 +11373,7 @@ public class Game1 : Game
         _inCave = false;
         
         _caveEntrance = new Rectangle(ax + 274, ay + 160, 48, 48);
-        int caveW = 400, caveH = 300;
+        int caveW = 8 * TSDst, caveH = 6 * TSDst; // 384×288, tile-aligned
         int caveCX = ScreenW / 2, caveCY = ScreenH / 2;
         _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
         _caveExit = new Rectangle(caveCX - 30, caveCY + caveH / 2 - 20, 60, 20);
@@ -11497,8 +11497,8 @@ public class Game1 : Game
         }
         
         // Spawn training dummies — stationary enemies with low HP, placed between the pillars
-        // Only if not cleared
-        if (!_unlockedForms.Contains(Form.Lance))
+        // Only if room not yet cleared
+        if (!_clearedScreens.Contains(2))
         {
             Vector2[] dummyPositions = new[]
             {
@@ -16090,7 +16090,6 @@ public class Game1 : Game
         if (_gameMode != GameMode.Awakening || _currentScreen != 2) return;
         if (_inTransition || _screenTransitionTimer > 0) return; // don't check during room transition
         if (_clearedScreens.Contains(2)) return;
-        if (_enemies.Count == 0) return; // dummies not spawned yet
         if (_enemies.Any(e => e.Alive)) return;
         
         // All dummies destroyed — spawn Lance on a pedestal (mark cleared immediately)
@@ -18283,8 +18282,8 @@ public class Game1 : Game
             // Editor grid origin for room 50 = cave tile origin = (ca.X - TSDst, ca.Y - TSDst)
             // Collision rects are stored relative to grid origin, and game renders tiles at same origin
             // So rects are already in the right coordinate space relative to the tile grid
-            int caveOX = ScreenW / 2 - 200 - TSDst; // 392
-            int caveOY = ScreenH / 2 - 150 - TSDst; // 162
+            int caveOX = ScreenW / 2 - 4 * TSDst - TSDst; // cave tile origin X
+            int caveOY = ScreenH / 2 - 3 * TSDst - TSDst; // cave tile origin Y
             foreach (var cr in caveCollRects)
             {
                 _caveWalls.Add(new Rectangle(caveOX + cr.Rect.X, caveOY + cr.Rect.Y, cr.Rect.Width, cr.Rect.Height));
@@ -25759,12 +25758,11 @@ public class Game1 : Game
     
     private Rectangle GetPaintArena(int room)
     {
-        if (room == 50) // Cave: 10×8 tiles matching in-game cave tile origin
+        if (room == 50) // Cave: tile-aligned grid matching in-game cave tile origin
         {
-            // Must match DrawCave() tile rendering: ox = ca.X - TSDst, oy = ca.Y - TSDst
-            // ca = _caveArea = centered 400×300 on screen
-            int caX = ScreenW / 2 - 200; // 440
-            int caY = ScreenH / 2 - 150;  // 210
+            // Cave area = 8×6 tiles centered on screen, grid adds 1-tile border = 10×8
+            int caX = ScreenW / 2 - 4 * TSDst; // cave area left
+            int caY = ScreenH / 2 - 3 * TSDst; // cave area top
             return new Rectangle(caX - TSDst, caY - TSDst, 10 * TSDst, 8 * TSDst);
         }
         return new Rectangle(60, 80, 1160, room == 11 ? 1300 : 580);
@@ -25772,7 +25770,7 @@ public class Game1 : Game
     
     private (int cols, int rows) GetRoomTileSize(int room)
     {
-        if (room == 50) return (10, 8); // Room 5b (cave interior): 400×300 → 10×8 tiles (1-tile border all sides)
+        if (room == 50) return (10, 8); // Room 5b (cave interior): 8×6 cave + 1-tile border = 10×8
         // Full screen width always 1280. Height depends on room
         int totalW = 1280; // ScreenW
         int totalH = room == 11 ? (80 + 1300 + 80) : 720; // Room 11: top margin + tall arena + bottom
@@ -25964,7 +25962,7 @@ public class Game1 : Game
                 // Set up cave data for room 5
                 int ax = _arena.Left, ay = _arena.Top;
                 _caveEntrance = new Rectangle(ax + 274, ay + 160, 48, 48);
-                int caveW = 400, caveH = 300;
+                int caveW = 8 * TSDst, caveH = 6 * TSDst; // 384×288, tile-aligned
                 int caveCX = ScreenW / 2, caveCY = ScreenH / 2;
                 _caveArea = new Rectangle(caveCX - caveW / 2, caveCY - caveH / 2, caveW, caveH);
             }
@@ -26475,15 +26473,10 @@ public class Game1 : Game
             if (_trPaintRoom == 50)
             {
                 // Cave: show _caveArea relative to tile grid origin
-                // In-game cave tiles start at (ca.X - TSDst, ca.Y - TSDst) = (392, 162)
-                // Editor grid origin for room 50 = ((1280-432)/2, (720-336)/2) = (424, 192)  
-                // But stored coords are grid-relative (0,0 = grid top-left)
-                // Cave area in game: (440, 210, 400, 300)
-                // Cave tile origin in game: (392, 162)
-                // In grid coords: cave area = (440-392, 210-162, 400, 300) = (48, 48, 400, 300) = (TSDst, TSDst, 400, 300)
+                // Cave area = 8×6 tiles, starts 1 tile into grid
                 oax = gridX + TSDst;
                 oay = gridY + TSDst;
-                oaw = 400; oah = 300;
+                oaw = 8 * TSDst; oah = 6 * TSDst; // tile-aligned cave area
             }
             else
             {
@@ -26510,20 +26503,19 @@ public class Game1 : Game
             else if (_trPaintRoom == 50)
             {
                 // Cave interior items — positions relative to tile grid origin
-                // Wand: at (caveCX, caveCY-10) in game = (640, 350) in screen coords
-                // In grid coords: (640-392, 350-162) = (248, 188)
-                int caveGridOX = ScreenW / 2 - (9 * TSDst / 2) - (ScreenW / 2 - 200 - TSDst); // = TSDst
-                // Simpler: cave tile origin = ca.X - TSDst. Grid origin maps to cave tile origin.
-                // So game coord -> grid coord: subtract (ca.X - TSDst, ca.Y - TSDst) = (392, 162)
-                int gox = ScreenW / 2 - 200 - TSDst; // 392
-                int goy = ScreenH / 2 - 150 - TSDst; // 162
+                // Grid origin = ca.X - TSDst, ca.Y - TSDst. Game coord → grid coord: subtract origin.
+                int gox = ScreenW / 2 - 4 * TSDst - TSDst; // cave tile origin X
+                int goy = ScreenH / 2 - 3 * TSDst - TSDst; // cave tile origin Y
+                // Wand: at (caveCX, caveCY-10) = (640, 350) in game
                 editorPickups.Add((new Vector2(ScreenW / 2 - gox, ScreenH / 2 - 10 - goy), "WAND", new Color(255, 215, 0)));
-                // Cracked wall / Wand of Merlin: right wall of cave area
-                int crackX = TSDst + 400 - 6; // ca.Right - 6 in grid coords = (ca.X + 400 - 6 - gox) = TSDst + 400 - 6
-                int crackY = TSDst + 300 / 3; // ca.Y + ca.Height/3 - goy = TSDst + 100
+                // Cracked wall: right wall of cave area
+                int caRight = ScreenW / 2 + 4 * TSDst; // cave area right edge
+                int caTop = ScreenH / 2 - 3 * TSDst;
+                int crackX = caRight + 6 - gox; // center of right wall
+                int crackY = caTop + 2 * TSDst - goy; // ca.Y + ca.Height/3
                 editorPickups.Add((new Vector2(crackX, crackY + 25), "CRACKED WALL", new Color(180, 140, 60)));
-                // Wand of Merlin spawns at ca.Right + 30 (in alcove behind crack)
-                editorPickups.Add((new Vector2(TSDst + 400 + 30, crackY + 25), "WAND OF MERLIN", new Color(100, 80, 200)));
+                // Wand of Merlin in alcove behind crack
+                editorPickups.Add((new Vector2(crackX + 30, crackY + 25), "WAND OF MERLIN", new Color(100, 80, 200)));
             }
             else if (_trPaintRoom == 6)
             {
