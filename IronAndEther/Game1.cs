@@ -281,7 +281,7 @@ public class Game1 : Game
     private int _caveReturnScreen = 5;
     private Vector2 _caveReturnPos;
     private Rectangle _caveArea; // the cave interior bounds
-    private List<Rectangle> _caveWalls = new(); // editor-placed collision inside cave (game coords)
+
     private Rectangle _caveEntrance; // the entrance hitbox in the overworld
     private Rectangle _caveExit; // the exit hitbox inside the cave
     private float _caveTransitionTimer = 0f;
@@ -11403,13 +11403,7 @@ public class Game1 : Game
         int ax = _arena.Left, ay = _arena.Top, aw = _arena.Width, ah = _arena.Height;
         switch (screen)
         {
-            case 1: // Gauntlet — dark arena, torches at corners and midpoints
-                _torches.Add(new Vector2(ax + 60, ay + 60));
-                _torches.Add(new Vector2(ax + aw - 60, ay + 60));
-                _torches.Add(new Vector2(ax + 60, ay + ah - 60));
-                _torches.Add(new Vector2(ax + aw - 60, ay + ah - 60));
-                _torches.Add(new Vector2(ax + aw / 2, ay + 60));
-                _torches.Add(new Vector2(ax + aw / 2, ay + ah - 60));
+            case 1: // Gauntlet — torches from tiles only
                 break;
             case 2: // Armory — torches along walls
                 _torches.Add(new Vector2(ax + 100, ay + 80));
@@ -16574,22 +16568,6 @@ public class Game1 : Game
             _playerPos.X = MathHelper.Clamp(_playerPos.X, _caveArea.Left + 10, rightClamp);
             _playerPos.Y = MathHelper.Clamp(_playerPos.Y, _caveArea.Top + 10, _caveArea.Bottom - 10);
             
-            // Editor-placed cave interior walls (room 50 collision)
-            foreach (var cw in _caveWalls)
-            {
-                var playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
-                if (!playerRect.Intersects(cw)) continue;
-                float pushL = playerRect.Right - cw.Left;
-                float pushR = cw.Right - playerRect.Left;
-                float pushU = playerRect.Bottom - cw.Top;
-                float pushD = cw.Bottom - playerRect.Top;
-                float minP = MathF.Min(MathF.Min(pushL, pushR), MathF.Min(pushU, pushD));
-                if (minP == pushL) _playerPos.X -= pushL;
-                else if (minP == pushR) _playerPos.X += pushR;
-                else if (minP == pushU) _playerPos.Y -= pushU;
-                else _playerPos.Y += pushD;
-            }
-            
             // Cracked wall — right wall of cave
             if (!_crackedWallBroken)
             {
@@ -18274,21 +18252,6 @@ public class Game1 : Game
             {
                 _screenWalls[room].Add(cr.Rect);
                 _screenWallOneWay[room].Add(cr.OneWay);
-            }
-        }
-        
-        // Room 50 (cave) collision — convert from editor grid coords to game screen coords
-        _caveWalls.Clear();
-        if (_roomCollision.TryGetValue(50, out var caveCollRects))
-        {
-            // Editor grid origin for room 50 = cave tile origin = (ca.X - TSDst, ca.Y - TSDst)
-            // Collision rects are stored relative to grid origin, and game renders tiles at same origin
-            // So rects are already in the right coordinate space relative to the tile grid
-            int caveOX = ScreenW / 2 - 4 * TSDst - TSDst; // cave tile origin X
-            int caveOY = ScreenH / 2 - 3 * TSDst - TSDst; // cave tile origin Y
-            foreach (var cr in caveCollRects)
-            {
-                _caveWalls.Add(new Rectangle(caveOX + cr.Rect.X, caveOY + cr.Rect.Y, cr.Rect.Width, cr.Rect.Height));
             }
         }
     }
