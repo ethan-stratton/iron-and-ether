@@ -16599,7 +16599,9 @@ public class Game1 : Game
             // Wand/wandofmerlin only collectable inside cave
             if ((p.Type == "wand" || p.Type == "wandofmerlin") && !_inCave) continue;
             float dist = Vector2.Distance(_playerPos, p.Position);
-            if (dist < 24f)
+            // DEBUG: show pickup distance on screen
+            if (p.Type == "wand") System.Diagnostics.Debug.WriteLine($"WAND PICKUP: dist={dist:F1} playerPos={_playerPos} wandPos={p.Position} inCave={_inCave}");
+            if (dist < 32f)
             {
                 // Collect!
                 p.Collected = true;
