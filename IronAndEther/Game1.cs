@@ -13976,13 +13976,6 @@ public class Game1 : Game
         // Dark floor tint
         DrawRect(ax, ay, aw, ah, new Color(15, 10, 10) * 0.3f);
         
-        // Pillar stone detail
-        foreach (var wall in _screenWalls[1])
-        {
-            DrawRect(wall.X + 2, wall.Y + 2, wall.Width - 4, 2, new Color(80, 75, 85)); // highlight
-            DrawRect(wall.X + 2, wall.Y + wall.Height - 3, wall.Width - 4, 2, new Color(40, 35, 45)); // shadow
-        }
-        
         // Wave indicator text (during combat)
         if (_gauntletStarted && _gauntletWave >= 1 && _gauntletWave <= 3 && _gauntletWaveDelay <= 0)
         {

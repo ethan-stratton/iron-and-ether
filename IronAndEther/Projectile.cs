@@ -600,42 +600,85 @@ public class Projectile
                 }
                 else if (FusionName == "Impaler")
                 {
-                    int glowH = thick + 8;
-                    int coreH = MathHelper.Max(thick / 2, 2);
-                    Vector2 srcOrigin = new Vector2(0, 0.5f);
-                    Color drillColor = new Color(200, 180, 140);
-                    sb.Draw(pixel, Position, null, drillColor * alpha * 0.3f, rotation,
-                        srcOrigin, new Vector2(len, glowH), SpriteEffects.None, 0);
-                    sb.Draw(pixel, Position, null, drillColor * alpha * 0.9f, rotation,
-                        srcOrigin, new Vector2(len, thick), SpriteEffects.None, 0);
-                    sb.Draw(pixel, Position, null, Color.White * alpha * 0.6f, rotation,
-                        srcOrigin, new Vector2(len, coreH), SpriteEffects.None, 0);
                     Vector2 beamN = BeamDirection;
                     if (beamN.LengthSquared() > 0) beamN.Normalize();
                     float perpX2 = -beamN.Y;
                     float perpY2 = beamN.X;
+                    Color drillColor = new Color(200, 180, 140);
+                    
+                    // Draw tapered lance beam (wide at base, pointed at tip)
+                    int segments = Math.Max((int)(len / 3f), 8);
+                    float baseWidth = thick * 1.2f;
+                    float tipWidth = 1f;
+                    
+                    for (int seg = 0; seg < segments; seg++)
+                    {
+                        float t = (float)seg / segments;
+                        float w;
+                        if (t < 0.7f)
+                        {
+                            // Main shaft: mostly uniform, slight taper
+                            w = baseWidth * (1f - t * 0.2f);
+                        }
+                        else
+                        {
+                            // Lance tip: sharp taper to point
+                            float tipT = (t - 0.7f) / 0.3f; // 0→1 over last 30%
+                            w = baseWidth * 0.86f * (1f - tipT) + tipWidth * tipT;
+                        }
+                        
+                        Vector2 segPos = Position + beamN * (len * t);
+                        
+                        // Glow
+                        float glowW = w + 6f * (1f - t);
+                        int halfGW = (int)(glowW / 2f);
+                        for (int pw = -halfGW; pw <= halfGW; pw++)
+                        {
+                            int px = (int)(segPos.X + perpX2 * pw);
+                            int py = (int)(segPos.Y + perpY2 * pw);
+                            sb.Draw(pixel, new Rectangle(px, py, 1, 1), drillColor * alpha * 0.2f);
+                        }
+                        
+                        // Core
+                        int halfCW = (int)(w / 2f);
+                        float brightT = 1f - t * 0.3f;
+                        Color coreCol = Color.Lerp(drillColor, Color.White, MathF.Max(0, 1f - t * 1.5f) * 0.4f);
+                        for (int pw = -halfCW; pw <= halfCW; pw++)
+                        {
+                            int px = (int)(segPos.X + perpX2 * pw);
+                            int py = (int)(segPos.Y + perpY2 * pw);
+                            sb.Draw(pixel, new Rectangle(px, py, 1, 1), coreCol * alpha * brightT);
+                        }
+                    }
+                    
+                    // Tip highlight — bright point at the very end
+                    Vector2 tipPos = Position + beamN * len;
+                    sb.Draw(pixel, new Rectangle((int)tipPos.X - 1, (int)tipPos.Y - 1, 2, 2),
+                        Color.White * alpha * 0.9f);
+                    
                     float drillSpeed = Age * 25f;
-                    // Drill spiral particles along full beam length
+                    // Drill spiral particles along beam (tighter near tip)
                     for (int g = 0; g < 16; g++)
                     {
                         float t3 = ((float)g / 16f + drillSpeed * 0.1f) % 1f;
                         Vector2 gp = Position + beamN * (t3 * len);
-                        float wave = MathF.Sin(drillSpeed + g * 1.2f) * (thick * 0.8f);
+                        float waveRadius = thick * 0.8f * (1f - t3 * 0.6f); // tighter spiral at tip
+                        float wave = MathF.Sin(drillSpeed + g * 1.2f) * waveRadius;
                         gp += new Vector2(perpX2, perpY2) * wave;
                         sb.Draw(pixel, new Rectangle((int)gp.X - 1, (int)gp.Y - 1, 3, 3),
                             new Color(255, 220, 150) * alpha * 0.7f);
                     }
-                    // Spinning drill crosses along full beam length
+                    // Spinning drill crosses (smaller toward tip)
                     for (int dc = 0; dc < 5; dc++)
                     {
                         float dt2 = (dc + 1) / 6f;
                         Vector2 crossPos = Position + beamN * (dt2 * len);
                         float crossAngle = drillSpeed * 3f + dc * 1.3f;
+                        float crossRadius = thick * (0.5f + 0.3f * dt2) * (1f - dt2 * 0.4f);
                         for (int arm = 0; arm < 4; arm++)
                         {
                             float a2 = crossAngle + arm * MathF.PI / 2f;
-                            float radius = thick * (0.5f + 0.3f * dt2);
-                            Vector2 tp = crossPos + new Vector2(MathF.Cos(a2), MathF.Sin(a2)) * radius;
+                            Vector2 tp = crossPos + new Vector2(MathF.Cos(a2), MathF.Sin(a2)) * crossRadius;
                             sb.Draw(pixel, new Rectangle((int)tp.X, (int)tp.Y, 2, 2), Color.White * alpha * 0.8f);
                         }
                     }

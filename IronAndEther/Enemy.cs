@@ -384,37 +384,59 @@ public class Enemy
                 break;
                 
             case EnemyType.HedgeSniper:
-                // Phase 0: hidden (no movement). Phase 1: pop up, shoot, hide again.
+                // Phase 0: perched — hover in place, shoot periodically
+                // Phase 1: relocating — fly rapidly to new position
+                // Phase 2: brief pause after arriving
                 if (AiPhase == 0)
                 {
-                    // Hidden — wait for timer
-                    if (AiStateTimer <= 0 && dist < 300f)
+                    // Hover with slight bob
+                    Position.Y += MathF.Sin(AiStateTimer * 4f + Id * 2f) * 0.3f * dt * 60f;
+                    
+                    // Shoot at player periodically
+                    if (ShootTimer <= 0 && dist < 300f)
+                    {
+                        ShootTimer = 1.8f + (Id % 3) * 0.3f;
+                        PendingShots.Add(new PendingShot
+                        {
+                            Direction = dirToPlayer,
+                            Speed = 200f, Damage = 12f, Size = 4f, Lifetime = 2f,
+                        });
+                    }
+                    
+                    // Relocate after timer
+                    if (AiStateTimer <= 0)
                     {
                         AiPhase = 1;
-                        AiStateTimer = 0.3f; // pop-up duration before shot
-                        Bark = "..."; BarkTimer = 0.4f;
+                        // Pick a random spot away from current position
+                        float angle = (float)new Random(Id * 31 + (int)(ShootTimer * 100)).NextDouble() * MathF.PI * 2f;
+                        float flyDist = 150f + (float)new Random(Id * 17 + (int)(ShootTimer * 50)).NextDouble() * 200f;
+                        AiTargetPos = Position + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * flyDist;
+                        AiTargetPos = new Vector2(
+                            MathHelper.Clamp(AiTargetPos.X, arena.Left + 40, arena.Right - 40),
+                            MathHelper.Clamp(AiTargetPos.Y, arena.Top + 40, arena.Bottom - 40));
+                        AiStateTimer = 0.4f; // fly duration
                     }
                 }
                 else if (AiPhase == 1)
                 {
-                    if (AiStateTimer <= 0)
+                    // Rapid fly to target
+                    Vector2 toTarget = AiTargetPos - Position;
+                    float tDist = toTarget.Length();
+                    if (tDist > 5f)
+                        Position += (toTarget / tDist) * moveSpeed * 4f * dt; // very fast flight
+                    
+                    if (AiStateTimer <= 0 || tDist < 8f)
                     {
-                        // Fire fast bolt at player
-                        PendingShots.Add(new PendingShot
-                        {
-                            Direction = dirToPlayer,
-                            Speed = 300f, Damage = 15f, Size = 3f, Lifetime = 1.5f,
-                        });
                         AiPhase = 2;
-                        AiStateTimer = 0.2f; // brief visible after shot
+                        AiStateTimer = 0.3f; // brief pause on arrival
                     }
                 }
-                else // Phase 2: visible cooldown, then hide
+                else // Phase 2: brief pause then back to perch
                 {
                     if (AiStateTimer <= 0)
                     {
                         AiPhase = 0;
-                        AiStateTimer = 2.5f + (Id % 3) * 0.5f; // stagger hide timers
+                        AiStateTimer = 1.5f + (Id % 4) * 0.5f; // 1.5-3.5s before next relocate
                     }
                 }
                 break;
