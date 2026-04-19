@@ -16596,8 +16596,7 @@ public class Game1 : Game
             p.BobTimer += dt;
             _pickups[i] = p;
             
-            // Check player proximity (wand/wandofmerlin only collectable inside cave)
-            if ((p.Type == "wand" || p.Type == "wandofmerlin") && !_inCave) continue;
+            // Wand/wandofmerlin — no location restriction (placed inside cave by design)
             float dist = Vector2.Distance(_playerPos, p.Position);
             if (dist < 24f)
             {
@@ -16988,9 +16987,6 @@ public class Game1 : Game
     {
         foreach (var p in _pickups)
         {
-            // Only draw wand when in cave
-            if ((p.Type == "wand" || p.Type == "wandofmerlin") && !_inCave) continue;
-            
             // Stone pedestal (always drawn, even after collection)
             int px = (int)p.Position.X;
             int py = (int)p.Position.Y;
@@ -17009,9 +17005,21 @@ public class Game1 : Game
             // Glow circle
             DrawRect((int)(drawPos.X - 12), (int)(drawPos.Y - 12), 24, 24, p.GlowColor * 0.12f * glow);
             DrawRect((int)(drawPos.X - 8), (int)(drawPos.Y - 8), 16, 16, p.GlowColor * 0.25f * glow);
-            // Item body
-            DrawRect((int)(drawPos.X - 5), (int)(drawPos.Y - 8), 10, 16, p.GlowColor * glow);
-            DrawRect((int)(drawPos.X - 3), (int)(drawPos.Y - 6), 6, 12, Color.White * glow);
+            
+            // Use gun texture for wand pickup if available
+            if ((p.Type == "wand" || p.Type == "wandofmerlin") && _titleWand != null)
+            {
+                float scale = 24f / MathF.Max(_titleWand.Width, _titleWand.Height);
+                _spriteBatch.Draw(_titleWand, drawPos, null, Color.White * glow,
+                    0f, new Vector2(_titleWand.Width / 2f, _titleWand.Height / 2f),
+                    scale, SpriteEffects.None, 0f);
+            }
+            else
+            {
+                // Fallback item body
+                DrawRect((int)(drawPos.X - 5), (int)(drawPos.Y - 8), 10, 16, p.GlowColor * glow);
+                DrawRect((int)(drawPos.X - 3), (int)(drawPos.Y - 6), 6, 12, Color.White * glow);
+            }
             // Light beam above
             DrawRect((int)(drawPos.X - 1), (int)(drawPos.Y - 60), 2, 52, p.GlowColor * 0.15f);
             DrawRect((int)(drawPos.X), (int)(drawPos.Y - 50), 1, 42, p.GlowColor * 0.25f);
