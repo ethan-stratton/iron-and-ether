@@ -11498,6 +11498,7 @@ public class Game1 : Game
         
         // Spawn training dummies — stationary enemies with low HP, placed between the pillars
         // Only if room not yet cleared
+        System.Diagnostics.Debug.WriteLine($"ROOM2INIT: cleared={_clearedScreens.Contains(2)} enemyCount={_enemies.Count}");
         if (!_clearedScreens.Contains(2))
         {
             Vector2[] dummyPositions = new[]
@@ -16090,7 +16091,9 @@ public class Game1 : Game
         if (_gameMode != GameMode.Awakening || _currentScreen != 2) return;
         if (_inTransition || _screenTransitionTimer > 0) return; // don't check during room transition
         if (_clearedScreens.Contains(2)) return;
+        System.Diagnostics.Debug.WriteLine($"ROOM2CHECK: enemies={_enemies.Count} alive={_enemies.Count(e => e.Alive)} inTrans={_inTransition} timer={_screenTransitionTimer:F3}");
         if (_enemies.Any(e => e.Alive)) return;
+        System.Diagnostics.Debug.WriteLine("ROOM2: AUTO-COMPLETING — NO ALIVE ENEMIES!");
         
         // All dummies destroyed — spawn Lance on a pedestal (mark cleared immediately)
         _clearedScreens.Add(2);
