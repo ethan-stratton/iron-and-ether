@@ -13862,33 +13862,6 @@ public class Game1 : Game
         // Dark floor tint
         DrawRect(ax, ay, aw, ah, new Color(15, 10, 10) * 0.3f);
         
-        // Torches on pillars (4 corners + center)
-        int[][] torchPositions = {
-            new[] { ax + 150, ay + 100 },
-            new[] { ax + 850, ay + 100 },
-            new[] { ax + 150, ay + 410 },
-            new[] { ax + 850, ay + 410 },
-        };
-        
-        foreach (var tp in torchPositions)
-        {
-            int tx = tp[0] + 15;
-            int ty = tp[1] - 20;
-            
-            // Torch bracket
-            DrawRect(tx - 2, ty + 10, 4, 10, new Color(100, 80, 50));
-            
-            // Flame
-            float flicker = MathF.Sin(time * 8f + tx * 0.1f) * 2f;
-            DrawRect(tx - 3, ty + (int)flicker, 6, 8, new Color(255, 180, 40) * 0.8f);
-            DrawRect(tx - 2, ty - 2 + (int)flicker, 4, 5, new Color(255, 220, 80) * 0.6f);
-            DrawRect(tx - 1, ty - 4 + (int)flicker, 2, 3, new Color(255, 255, 200) * 0.4f);
-            
-            // Light pool on ground
-            float lightPulse = (MathF.Sin(time * 3f + tx) + 1f) / 2f;
-            DrawRect(tx - 20, ty + 20, 40, 20, new Color(255, 150, 40) * (0.03f + lightPulse * 0.02f));
-        }
-        
         // Pillar stone detail
         foreach (var wall in _screenWalls[1])
         {
