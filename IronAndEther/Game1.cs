@@ -16596,7 +16596,8 @@ public class Game1 : Game
             p.BobTimer += dt;
             _pickups[i] = p;
             
-            // Wand/wandofmerlin — no location restriction (placed inside cave by design)
+            // Wand/wandofmerlin only collectable inside cave
+            if ((p.Type == "wand" || p.Type == "wandofmerlin") && !_inCave) continue;
             float dist = Vector2.Distance(_playerPos, p.Position);
             if (dist < 24f)
             {
@@ -16987,6 +16988,9 @@ public class Game1 : Game
     {
         foreach (var p in _pickups)
         {
+            // Only draw wand when in cave
+            if ((p.Type == "wand" || p.Type == "wandofmerlin") && !_inCave) continue;
+            
             // Stone pedestal (always drawn, even after collection)
             int px = (int)p.Position.X;
             int py = (int)p.Position.Y;
