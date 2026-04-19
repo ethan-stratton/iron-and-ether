@@ -18150,9 +18150,8 @@ public class Game1 : Game
         bool hasTiles = _roomTileData.ContainsKey(room) || _roomTileMid.ContainsKey(room) || _roomTileOverlay.ContainsKey(room);
         if (!hasTiles) return;
         
-        // Add tile-based torches alongside hardcoded ones (don't clear — both sources contribute)
-        int arenaX = (room == 50) ? ScreenW / 2 - 4 * TSDst - TSDst : 0;
-        int arenaY = (room == 50) ? ScreenH / 2 - 3 * TSDst - TSDst : 0;
+        // Tile data takes over — clear hardcoded torches, use painted torch tiles only
+        _torches.Clear();
         
         _roomTileData.TryGetValue(room, out var bg);
         _roomTileMid.TryGetValue(room, out var mid);
