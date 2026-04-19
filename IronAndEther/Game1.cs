@@ -281,7 +281,7 @@ public class Game1 : Game
     private int _caveReturnScreen = 5;
     private Vector2 _caveReturnPos;
     private Rectangle _caveArea; // the cave interior bounds
-
+    private List<Rectangle> _caveWalls = new(); // editor-placed collision inside cave (game coords)
     private Rectangle _caveEntrance; // the entrance hitbox in the overworld
     private Rectangle _caveExit; // the exit hitbox inside the cave
     private float _caveTransitionTimer = 0f;
@@ -16568,6 +16568,22 @@ public class Game1 : Game
             _playerPos.X = MathHelper.Clamp(_playerPos.X, _caveArea.Left + 10, rightClamp);
             _playerPos.Y = MathHelper.Clamp(_playerPos.Y, _caveArea.Top + 10, _caveArea.Bottom - 10);
             
+            // Editor-placed cave interior walls (room 50 collision)
+            foreach (var cw in _caveWalls)
+            {
+                var playerRect = new Rectangle((int)(_playerPos.X - PlayerSize/2), (int)(_playerPos.Y - PlayerHitboxH/2 + PlayerHitboxOffsetY), (int)PlayerSize, (int)PlayerHitboxH);
+                if (!playerRect.Intersects(cw)) continue;
+                float pushL = playerRect.Right - cw.Left;
+                float pushR = cw.Right - playerRect.Left;
+                float pushU = playerRect.Bottom - cw.Top;
+                float pushD = cw.Bottom - playerRect.Top;
+                float minP = MathF.Min(MathF.Min(pushL, pushR), MathF.Min(pushU, pushD));
+                if (minP == pushL) _playerPos.X -= pushL;
+                else if (minP == pushR) _playerPos.X += pushR;
+                else if (minP == pushU) _playerPos.Y -= pushU;
+                else _playerPos.Y += pushD;
+            }
+            
             // Cracked wall — right wall of cave
             if (!_crackedWallBroken)
             {
@@ -18205,14 +18221,8 @@ public class Game1 : Game
         
         // Screens 1,3,7,9: empty for now
         // Screen 1 (The Gauntlet): dark gladiatorial pit with pillars
-        _screenWalls[1] = new List<Rectangle>
-        {
-            new(ax + 150, ay + 120, 30, 30),    // pillar top-left
-            new(ax + 850, ay + 120, 30, 30),    // pillar top-right
-            new(ax + 150, ay + 410, 30, 30),    // pillar bottom-left
-            new(ax + 850, ay + 410, 30, 30),    // pillar bottom-right
-            new(ax + 500, ay + 260, 30, 30),    // center pillar
-        };
+        // Screen 1 (The Gauntlet): collision from editor only
+        _screenWalls[1] = new List<Rectangle>();
         // Screen 3 (The Proving Grounds): overgrown arena with crumbled walls
         _screenWalls[3] = new List<Rectangle>
         {
@@ -18252,6 +18262,18 @@ public class Game1 : Game
             {
                 _screenWalls[room].Add(cr.Rect);
                 _screenWallOneWay[room].Add(cr.OneWay);
+            }
+        }
+        
+        // Room 50 (cave) collision — convert from editor grid coords to game screen coords
+        _caveWalls.Clear();
+        if (_roomCollision.TryGetValue(50, out var caveCollRects))
+        {
+            int caveOX = ScreenW / 2 - 4 * TSDst - TSDst; // cave tile origin X
+            int caveOY = ScreenH / 2 - 3 * TSDst - TSDst; // cave tile origin Y
+            foreach (var cr in caveCollRects)
+            {
+                _caveWalls.Add(new Rectangle(caveOX + cr.Rect.X, caveOY + cr.Rect.Y, cr.Rect.Width, cr.Rect.Height));
             }
         }
     }
