@@ -11470,6 +11470,7 @@ public class Game1 : Game
         switch (screen)
         {
             case 1: InitAwakeningRoom1(); break;
+            case 2: InitAwakeningRoom2(); break;
             case 3: InitAwakeningRoom3(); break;
             case 4: InitAwakeningRoom4(); break;
             case 6: InitAwakeningRoom6(); break;
